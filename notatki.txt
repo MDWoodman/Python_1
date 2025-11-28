@@ -1,0 +1,24 @@
+Plan podzialu zadan - Projekt Tradingowy
+
+I. Otwieranie transakcji
+1. Sprawdzic warunki wejsciowe (BUY/SELL) -> funkcja check_entry_conditions()
+2. Okreslic: kwote transakcji (lot, wolumen), poziom SL (stop loss), poziom TP (take profit)
+3. Wywolac funkcje open_trade() z odpowiednimi parametrami
+4. Obsluzyc odpowiedz z brokera/API (czy zlecenie weszlo, czy byl blad)
+
+II. Aktualizacja list otwartych transakcji
+5. Utworzyc dwie oddzielne listy: open_buy_trades oraz open_sell_trades
+6. Po otwarciu transakcji, dodac rekord do odpowiedniej listy (BUY lub SELL) z informacjami: ID, symbol, cena otwarcia, SL, TP, timestamp, wolumen
+
+III. Monitoring otwartych transakcji
+7. Zbudowac petle monitorujaca listy otwartych transakcji (np. co X sekund)
+8. Dla kazdej otwartej transakcji: sprawdzic biezaca cene, porownac z poziomami SL/TP, sprawdzic dodatkowe warunki zamkniecia
+
+IV. Zamkniecie transakcji
+9. Stworzyc funkcje close_trade(trade_id)
+10. Gdy warunki zamkniecia sa spelnione: wywolac zamkniecie przez API, usunac rekord z odpowiedniej listy, zapisac log zamkniecia
+
+V. Zarzadzanie bledami i wyjatkami
+11. Obsluzyc sytuacje, gdy API zwroci blad (np. brak polaczenia, odmowa przyjecia zlecenia)
+12. Dodac mechanizm ponawiania prob (retry)
+13. Wprowadzic alarm/log, jesli operacja nie powiedzie sie po X probach

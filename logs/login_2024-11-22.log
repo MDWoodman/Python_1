@@ -1,0 +1,4 @@
+2024-11-22 22:40:33,431 - jsonSocket - INFO - Socket connected
+2024-11-22 22:40:33,431 - jsonSocket - INFO - Sent: b'{"command": "login", "arguments": {"userId": "2470872", "password": "Adam1357!?", "appName": ""}}'
+2024-11-22 22:43:10,905 - jsonSocket - INFO - Socket connected
+2024-11-22 22:43:16,770 - jsonSocket - INFO - Sent: b'{"command": "login", "arguments": {"userId": "2470872", "password": "Adam1357!?", "appName": ""}}'

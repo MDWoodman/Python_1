@@ -1,0 +1,71 @@
+2024-12-01 21:20:35,224 - jsonSocket - INFO - Socket connected
+2024-12-01 21:20:35,232 - jsonSocket - INFO - Sent: b'{"command": "login", "arguments": {"userId": "2470872", "password": "M820824d!", "appName": ""}}'
+2024-12-01 21:20:35,337 - jsonSocket - INFO - Received: {'status': True, 'streamSessionId': '005056fffebf4b2c-00005809-0011cd9a-f7a7de8a2e94960a-9b474f21'}
+2024-12-01 21:20:35,340 - jsonSocket - INFO - {'status': True, 'streamSessionId': '005056fffebf4b2c-00005809-0011cd9a-f7a7de8a2e94960a-9b474f21'}
+2024-12-01 21:20:35,343 - root - INFO - {'status': True, 'streamSessionId': '005056fffebf4b2c-00005809-0011cd9a-f7a7de8a2e94960a-9b474f21'}
+2024-12-01 21:20:35,893 - jsonSocket - INFO - Sent: b'{"command": "getChartLastRequest", "arguments": {"info": {"period": 1, "start": 6239103750000, "symbol": "USDJPY"}}}'
+2024-12-01 21:20:36,002 - jsonSocket - INFO - Received: {'status': False, 'errorCode': 'BE106', 'errorDescr': 'The candle data cannot be returned'}
+2024-12-01 21:20:36,005 - jsonSocket - ERROR - Failed to fetch the most recent candlestick data for USDJPY. Error code: BE106
+2024-12-01 21:21:45,217 - jsonSocket - INFO - Socket connected
+2024-12-01 21:21:45,225 - jsonSocket - INFO - Sent: b'{"command": "login", "arguments": {"userId": "2470872", "password": "M820824d!", "appName": ""}}'
+2024-12-01 21:21:45,330 - jsonSocket - INFO - Received: {'status': True, 'streamSessionId': '005056fffebf4b2c-00005809-0011cfa7-ada706b42097a773-c6edff19'}
+2024-12-01 21:21:45,332 - jsonSocket - INFO - {'status': True, 'streamSessionId': '005056fffebf4b2c-00005809-0011cfa7-ada706b42097a773-c6edff19'}
+2024-12-01 21:21:45,337 - root - INFO - {'status': True, 'streamSessionId': '005056fffebf4b2c-00005809-0011cfa7-ada706b42097a773-c6edff19'}
+2024-12-01 21:22:03,700 - jsonSocket - INFO - Socket connected
+2024-12-01 21:22:03,708 - jsonSocket - INFO - Sent: b'{"command": "login", "arguments": {"userId": "2470872", "password": "M820824d!", "appName": ""}}'
+2024-12-01 21:22:03,813 - jsonSocket - INFO - Received: {'status': True, 'streamSessionId': '005056fffebf4b2c-00005809-0011d036-c51228dfd0966fa6-4b2572e1'}
+2024-12-01 21:22:03,817 - jsonSocket - INFO - {'status': True, 'streamSessionId': '005056fffebf4b2c-00005809-0011d036-c51228dfd0966fa6-4b2572e1'}
+2024-12-01 21:22:03,821 - root - INFO - {'status': True, 'streamSessionId': '005056fffebf4b2c-00005809-0011d036-c51228dfd0966fa6-4b2572e1'}
+2024-12-01 21:22:25,842 - jsonSocket - INFO - Socket connected
+2024-12-01 21:22:25,845 - jsonSocket - INFO - Sent: b'{"command": "login", "arguments": {"userId": "2470872", "password": "M820824d!", "appName": ""}}'
+2024-12-01 21:22:25,948 - jsonSocket - INFO - Received: {'status': True, 'streamSessionId': '005056fffebf4b2c-00005809-0011d117-8fea86c97096c62d-62b05a74'}
+2024-12-01 21:22:25,951 - jsonSocket - INFO - {'status': True, 'streamSessionId': '005056fffebf4b2c-00005809-0011d117-8fea86c97096c62d-62b05a74'}
+2024-12-01 21:22:25,956 - root - INFO - {'status': True, 'streamSessionId': '005056fffebf4b2c-00005809-0011d117-8fea86c97096c62d-62b05a74'}
+2024-12-01 21:22:29,899 - jsonSocket - INFO - Sent: b'{"command": "getChartLastRequest", "arguments": {"info": {"period": 1, "start": 6239104149600, "symbol": "USDJPY"}}}'
+2024-12-01 21:22:30,003 - jsonSocket - INFO - Received: {'status': False, 'errorCode': 'BE106', 'errorDescr': 'The candle data cannot be returned'}
+2024-12-01 21:22:30,005 - jsonSocket - ERROR - Failed to fetch the most recent candlestick data for USDJPY. Error code: BE106
+2024-12-01 21:26:26,355 - jsonSocket - INFO - Socket connected
+2024-12-01 21:26:26,363 - jsonSocket - INFO - Sent: b'{"command": "login", "arguments": {"userId": "2470872", "password": "M820824d!", "appName": ""}}'
+2024-12-01 21:26:26,470 - jsonSocket - INFO - Received: {'status': True, 'streamSessionId': '005056fffebf4b2c-00005809-0011d8c8-bc65a6c9631271b4-77f02f8f'}
+2024-12-01 21:26:26,473 - jsonSocket - INFO - {'status': True, 'streamSessionId': '005056fffebf4b2c-00005809-0011d8c8-bc65a6c9631271b4-77f02f8f'}
+2024-12-01 21:26:26,476 - root - INFO - {'status': True, 'streamSessionId': '005056fffebf4b2c-00005809-0011d8c8-bc65a6c9631271b4-77f02f8f'}
+2024-12-01 21:26:51,963 - jsonSocket - INFO - Sent: b'{"command": "getChartLastRequest", "arguments": {"info": {"period": 1, "start": 6239105013600, "symbol": "USDJPY"}}}'
+2024-12-01 21:26:52,087 - jsonSocket - INFO - Received: {'status': False, 'errorCode': 'BE106', 'errorDescr': 'The candle data cannot be returned'}
+2024-12-01 21:34:13,096 - jsonSocket - INFO - Socket connected
+2024-12-01 21:34:13,100 - jsonSocket - INFO - Sent: b'{"command": "login", "arguments": {"userId": "2470872", "password": "M820824d!", "appName": ""}}'
+2024-12-01 21:34:13,208 - jsonSocket - INFO - Received: {'status': True, 'streamSessionId': '005056fffebf4b2c-00005809-0011e9a1-aff06873ad1b10f5-3477c1fe'}
+2024-12-01 21:34:13,211 - jsonSocket - INFO - {'status': True, 'streamSessionId': '005056fffebf4b2c-00005809-0011e9a1-aff06873ad1b10f5-3477c1fe'}
+2024-12-01 21:34:13,214 - root - INFO - {'status': True, 'streamSessionId': '005056fffebf4b2c-00005809-0011e9a1-aff06873ad1b10f5-3477c1fe'}
+2024-12-01 21:34:21,348 - jsonSocket - INFO - Sent: b'{"command": "getChartLastRequest", "arguments": {"info": {"period": 5, "start": 6239105830800, "symbol": "USDJPY"}}}'
+2024-12-01 21:34:21,451 - jsonSocket - INFO - Received: {'status': False, 'errorCode': 'BE106', 'errorDescr': 'The candle data cannot be returned'}
+2024-12-01 21:39:26,300 - jsonSocket - INFO - Socket connected
+2024-12-01 21:39:26,308 - jsonSocket - INFO - Sent: b'{"command": "login", "arguments": {"userId": "2470872", "password": "M820824d!", "appName": ""}}'
+2024-12-01 21:39:26,412 - jsonSocket - INFO - Received: {'status': True, 'streamSessionId': '005056fffebf4b2c-00005809-0011f4dd-101d4fbcbe065871-678d0204'}
+2024-12-01 21:39:26,415 - jsonSocket - INFO - {'status': True, 'streamSessionId': '005056fffebf4b2c-00005809-0011f4dd-101d4fbcbe065871-678d0204'}
+2024-12-01 21:39:26,418 - root - INFO - {'status': True, 'streamSessionId': '005056fffebf4b2c-00005809-0011f4dd-101d4fbcbe065871-678d0204'}
+2024-12-01 21:51:09,776 - jsonSocket - INFO - Socket connected
+2024-12-01 21:51:09,783 - jsonSocket - INFO - Sent: b'{"command": "login", "arguments": {"userId": "2470872", "password": "M820824d!", "appName": ""}}'
+2024-12-01 21:51:09,887 - jsonSocket - INFO - Received: {'status': True, 'streamSessionId': '005056fffebf4b2c-00005809-00120c5c-d87a7b9085f0947e-a0743e3b'}
+2024-12-01 21:51:09,889 - jsonSocket - INFO - {'status': True, 'streamSessionId': '005056fffebf4b2c-00005809-00120c5c-d87a7b9085f0947e-a0743e3b'}
+2024-12-01 21:51:09,894 - root - INFO - {'status': True, 'streamSessionId': '005056fffebf4b2c-00005809-00120c5c-d87a7b9085f0947e-a0743e3b'}
+2024-12-01 21:52:45,304 - jsonSocket - INFO - Socket connected
+2024-12-01 21:52:45,312 - jsonSocket - INFO - Sent: b'{"command": "login", "arguments": {"userId": "2470872", "password": "M820824d!", "appName": ""}}'
+2024-12-01 21:52:45,416 - jsonSocket - INFO - Received: {'status': True, 'streamSessionId': '005056fffebf4b2c-00005809-00120f67-095f28ecedf209ab-1d5bec48'}
+2024-12-01 21:52:45,419 - jsonSocket - INFO - {'status': True, 'streamSessionId': '005056fffebf4b2c-00005809-00120f67-095f28ecedf209ab-1d5bec48'}
+2024-12-01 21:52:45,426 - root - INFO - {'status': True, 'streamSessionId': '005056fffebf4b2c-00005809-00120f67-095f28ecedf209ab-1d5bec48'}
+2024-12-01 21:52:56,892 - jsonSocket - INFO - Sent: b'{"command": "getChartLastRequest", "arguments": {"info": {"period": 5, "start": 1733089668, "symbol": "USDJPY"}}}'
+2024-12-01 21:52:56,997 - jsonSocket - INFO - Received: {'status': False, 'errorCode': 'EX009', 'errorDescr': 'Data limit potentially exceeded. Please narrow your request range.'}
+2024-12-01 21:57:44,189 - jsonSocket - INFO - Socket connected
+2024-12-01 21:57:44,198 - jsonSocket - INFO - Sent: b'{"command": "login", "arguments": {"userId": "2470872", "password": "M820824d!", "appName": ""}}'
+2024-12-01 21:57:44,303 - jsonSocket - INFO - Received: {'status': True, 'streamSessionId': '005056fffebf4b2c-00005809-00121963-288385fab90e993a-d45c2c19'}
+2024-12-01 21:57:44,306 - jsonSocket - INFO - {'status': True, 'streamSessionId': '005056fffebf4b2c-00005809-00121963-288385fab90e993a-d45c2c19'}
+2024-12-01 21:57:44,310 - root - INFO - {'status': True, 'streamSessionId': '005056fffebf4b2c-00005809-00121963-288385fab90e993a-d45c2c19'}
+2024-12-01 21:59:06,313 - jsonSocket - INFO - Sent: b'{"command": "getChartLastRequest", "arguments": {"info": {"period": 5, "start": 1733089982, "symbol": "USDJPY"}}}'
+2024-12-01 21:59:06,416 - jsonSocket - INFO - Received: {'status': False, 'errorCode': 'EX009', 'errorDescr': 'Data limit potentially exceeded. Please narrow your request range.'}
+2024-12-01 22:08:01,839 - jsonSocket - INFO - Socket connected
+2024-12-01 22:08:01,847 - jsonSocket - INFO - Sent: b'{"command": "login", "arguments": {"userId": "2470872", "password": "M820824d!", "appName": ""}}'
+2024-12-01 22:08:01,952 - jsonSocket - INFO - Received: {'status': True, 'streamSessionId': '005056fffebf4b2c-00005809-00122ea1-7f5543f5b6800602-21687041'}
+2024-12-01 22:08:01,955 - jsonSocket - INFO - {'status': True, 'streamSessionId': '005056fffebf4b2c-00005809-00122ea1-7f5543f5b6800602-21687041'}
+2024-12-01 22:08:01,959 - root - INFO - {'status': True, 'streamSessionId': '005056fffebf4b2c-00005809-00122ea1-7f5543f5b6800602-21687041'}
+2024-12-01 22:08:13,086 - jsonSocket - INFO - Sent: b'{"command": "getChartLastRequest", "arguments": {"info": {"period": 5, "start": 1733086986, "symbol": "USDJPY"}}}'
+2024-12-01 22:08:13,190 - jsonSocket - INFO - Received: {'status': False, 'errorCode': 'EX009', 'errorDescr': 'Data limit potentially exceeded. Please narrow your request range.'}

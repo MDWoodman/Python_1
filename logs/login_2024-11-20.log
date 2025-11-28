@@ -1,0 +1,14 @@
+2024-11-20 21:47:16,602 - jsonSocket - INFO - Socket connected
+2024-11-20 21:47:16,618 - jsonSocket - INFO - Sent: b'{"command": "login", "arguments": {"userId": "2470872", "password": "Adam1357!?", "appName": ""}}'
+2024-11-20 21:47:16,743 - jsonSocket - INFO - Received: {'status': True, 'streamSessionId': '005056fffebf4b2c-00352d3f-0039069f-8c74417ff35e0c7d-8ee17ea5'}
+2024-11-20 21:47:16,743 - jsonSocket - INFO - {'status': True, 'streamSessionId': '005056fffebf4b2c-00352d3f-0039069f-8c74417ff35e0c7d-8ee17ea5'}
+2024-11-20 21:47:23,504 - root - INFO - None
+2024-11-20 21:52:09,936 - jsonSocket - INFO - Socket connected
+2024-11-20 21:52:09,939 - jsonSocket - INFO - Sent: b'{"command": "login", "arguments": {"userId": "2470872", "password": "Adam1357!?", "appName": ""}}'
+2024-11-20 21:52:10,047 - jsonSocket - INFO - Received: {'status': True, 'streamSessionId': '005056fffebf4b2c-00352d3f-00390fc3-762270d2cd52764b-434639d8'}
+2024-11-20 21:52:10,050 - jsonSocket - INFO - {'status': True, 'streamSessionId': '005056fffebf4b2c-00352d3f-00390fc3-762270d2cd52764b-434639d8'}
+2024-11-20 21:53:13,063 - jsonSocket - INFO - Socket connected
+2024-11-20 21:53:13,063 - jsonSocket - INFO - Sent: b'{"command": "login", "arguments": {"userId": "2470872", "password": "Adam1357!?", "appName": ""}}'
+2024-11-20 21:53:13,173 - jsonSocket - INFO - Received: {'status': True, 'streamSessionId': '005056fffebf4b2c-00352d3f-003911ac-4432853f45517ce0-94ad7423'}
+2024-11-20 21:53:13,173 - jsonSocket - INFO - {'status': True, 'streamSessionId': '005056fffebf4b2c-00352d3f-003911ac-4432853f45517ce0-94ad7423'}
+2024-11-20 21:53:20,630 - root - INFO - {'status': True, 'streamSessionId': '005056fffebf4b2c-00352d3f-003911ac-4432853f45517ce0-94ad7423'}

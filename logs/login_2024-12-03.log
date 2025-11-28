@@ -1,0 +1,5 @@
+2024-12-03 07:03:58,509 - jsonSocket - INFO - Socket connected
+2024-12-03 07:03:58,513 - jsonSocket - INFO - Sent: b'{"command": "login", "arguments": {"userId": "17134523", "password": "M820824d!", "appName": ""}}'
+2024-12-03 07:03:58,625 - jsonSocket - INFO - Received: {'status': True, 'streamSessionId': '005056fffeb96ad7-000da630-003c8f4d-7c5adb53d8a69188-3c3b514f'}
+2024-12-03 07:03:58,627 - jsonSocket - INFO - {'status': True, 'streamSessionId': '005056fffeb96ad7-000da630-003c8f4d-7c5adb53d8a69188-3c3b514f'}
+2024-12-03 07:03:58,629 - root - INFO - {'status': True, 'streamSessionId': '005056fffeb96ad7-000da630-003c8f4d-7c5adb53d8a69188-3c3b514f'}

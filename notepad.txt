@@ -1,0 +1,31 @@
+  adx_analyze_result_obj = analyze_adx_candles(candles , product)
+            print(f"Time adx result {tools.int_to_datetime( adx_analyze_result_obj.get_time())}")
+            if(adx_analyze_result_obj.get_result() != adx.adx_result_enum.Boczny) :
+                print(f"ADX Data godzina : {datetime.now() } , Symbol {symbol} , Result {adx_analyze_result_obj.get_result()} , Time {tools.int_to_datetime(adx_analyze_result_obj.get_time())}")
+            else:
+                print(f"ADX Data godzina : {datetime.now() } , Symbol {symbol}")
+
+
+            ichimoku_analyze_result_obj = analzye_ichimoku_candles(candles , product)
+            print(f"Time ichimoku result {tools.int_to_datetime( ichimoku_analyze_result_obj.get_time())}")
+              analaze_result_obj = global_result.AnalysisResult(adx_analyze_result_obj , mcad_analyze_result_obj)
+            diff_time =  analaze_result_obj.get_time_difference()
+
+            time_diff_in_minutes = analaze_result_obj.convert_time_to_minutes(diff_time)
+            print(f"Time difference in minutes {time_diff_in_minutes}")
+            print(f"Time difference {diff_time}")
+
+
+  mcad_analyze_result_obj = analyze_mcad_candles(candles , product)
+            print(f"Time mcad result {tools.int_to_datetime(mcad_analyze_result_obj.get_time())}")
+            if(mcad_analyze_result_obj.get_result() != mcad.mcad_result_enum.Boczny) :
+                 print(f"MCAD Data godzina : {datetime.now() } , Symbol {symbol} , Result {mcad_analyze_result_obj.get_result()} , Time {tools.int_to_datetime(mcad_analyze_result_obj.get_time())}")
+            else:
+                print(f"MCAD Data godzina : {datetime.now() } , Symbol {symbol}")
+
+
+                 analaze_result_obj = global_result.AnalysisResult(adx_analyze_result_obj , mcad_analyze_result_obj)
+            diff_time =  analaze_result_obj.get_time_difference()
+            time_diff_in_minutes = analaze_result_obj.convert_time_to_minutes(diff_time)
+            print(f"Time difference in minutes {time_diff_in_minutes}")
+            print(f"Time difference {diff_time}")

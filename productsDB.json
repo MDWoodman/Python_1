@@ -1,0 +1,10 @@
+[
+    
+    {
+        "symbol": "USDJPY",
+        "name": "US Dollar / Japanese Yen",
+        "risk_price" : 10,
+        "SL": 20
+
+    }
+]
