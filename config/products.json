@@ -1,0 +1,50 @@
+[
+    {
+        "symbol": "STOXX50",
+        "short_window_mcad": 12,
+        "long_window_mcad": 26,
+        "signal_window_mcad": 9,
+        "angle_mcad": 25,
+        "adx_window": 14,
+        "adx_adx": 30,
+        "tenkansen_period": 9,
+        "kijunsen_period": 26,
+        "senkouspan_period": 52
+    },
+    {
+        "symbol": "UK100",
+        "short_window_mcad": 12,
+        "long_window_mcad": 26,
+        "signal_window_mcad": 9,
+        "angle_mcad": 25,
+        "adx_window": 14,
+        "adx_adx": 30,
+        "tenkansen_period": 9,
+        "kijunsen_period": 26,
+        "senkouspan_period": 52
+    },
+    {
+        "symbol": "USTEC",
+        "short_window_mcad": 12,
+        "long_window_mcad": 26,
+        "signal_window_mcad": 9,
+        "angle_mcad": 25,
+        "adx_window": 14,
+        "adx_adx": 30,
+        "tenkansen_period": 9,
+        "kijunsen_period": 26,
+        "senkouspan_period": 52
+    },
+    {
+        "symbol": "US30",
+        "short_window_mcad": 12,
+        "long_window_mcad": 26,
+        "signal_window_mcad": 9,
+        "angle_mcad": 25,
+        "adx_window": 14,
+        "adx_adx": 30,
+        "tenkansen_period": 9,
+        "kijunsen_period": 26,
+        "senkouspan_period": 52
+    }
+]

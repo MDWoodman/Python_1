@@ -2,7 +2,7 @@ import os
 import datetime
 import logging
 
-from candle import Candle
+#from candle import Candle
 
 
 def logger_configuration():
@@ -89,18 +89,6 @@ def calculate_multiplication_v2(period):
     else:
         raise ValueError(f"Unsupported period: {period}")   
     
-def FormatCandles(candle : Candle) :
-
-    new_open = candle.open
-    new_close =candle.open + candle.close
-    new_high = candle.open + candle.high
-    new_low = candle.open + candle.low
-    new_vol = candle.tick_volume
-    new_ctmString = candle.time
-
-    new_candle = Candle( new_ctmString, new_open, new_high, new_low, new_close, new_vol)
-   
-    return new_candle
 
 def get_end_time():
     return int(datetime.datetime.now().timestamp() + 3600)
@@ -148,49 +136,6 @@ class Period(Enum):
     MN1 = 43200   # 43200 minutes (30 days)
 
 
-def draw_chart(candles_data):
-    import matplotlib.pyplot as plt
-    import matplotlib.dates as mdates
-
-    dates = [datetime.fromtimestamp(candle['time']) for candle in candles_data]
-    opens = [candle['open'] for candle in candles_data]
-    highs = [candle['high'] for candle in candles_data]
-    lows = [candle['low'] for candle in candles_data]
-    closes = [candle['close'] for candle in candles_data]
-
-    fig, ax = plt.subplots()
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M:%S'))
-    ax.xaxis.set_major_locator(mdates.HourLocator(interval=1))
-    plt.xticks(rotation=45)
-
-    for i in range(len(dates)):
-        color = 'green' if closes[i] >= opens[i] else 'red'
-        ax.plot([dates[i], dates[i]], [lows[i], highs[i]], color='black')
-        ax.plot([dates[i], dates[i]], [opens[i], closes[i]], color=color, linewidth=5)
-
-    plt.xlabel('Time')
-    plt.ylabel('Price')
-    plt.title('Candlestick Chart')
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show()
-    return ax
-
-def update_chart(ax, new_candles_data):
-    import matplotlib.dates as mdates
-
-    dates = [datetime.datetime.fromtimestamp(candle['time']) for candle in new_candles_data]
-    opens = [candle['open'] for candle in new_candles_data]
-    highs = [candle['high'] for candle in new_candles_data]
-    lows = [candle['low'] for candle in new_candles_data]
-    closes = [candle['close'] for candle in new_candles_data]
-
-    for i in range(len(dates)):
-        color = 'green' if closes[i] >= opens[i] else 'red'
-        ax.plot([dates[i], dates[i]], [lows[i], highs[i]], color='black')
-        ax.plot([dates[i], dates[i]], [opens[i], closes[i]], color=color, linewidth=5)
-
-    ax.figure.canvas.draw()
 def position_size(account_risk_usd, stop_loss_pips, pair, price,volume=1):
     """
     account_risk_usd: kwota, którą chcesz ryzykować (np. 100 USD)
@@ -224,8 +169,8 @@ def pip_value(lot_size, pair, price):
 def int_to_datetime(timestamp):
     if isinstance(timestamp, str):
         timestamp = int(timestamp)
-    return datetime.datetime.fromtimestamp(timestamp/1000)
-def get_max_time_from_list(int_list : []) -> int:
+    return datetime.datetime.utcfromtimestamp(timestamp/1000)
+def get_max_time_from_list(int_list: list[int]) -> int:
     """
     Returns the maximum integer value from a list of integers.
 
@@ -248,18 +193,37 @@ def  transaction_already_opened(opened_transactions_list : list[tt.TransactionTr
 
 def time_string_to_timestamp(time_string: str) -> int:
     """
-    Converts a time string in the format 'YYYY.MM.DD HH:MM' to a Unix timestamp.
+    Converts a time string to a Unix timestamp in milliseconds.
 
     Args:
-        time_string (str): The time string to convert (e.g., '2025.04.28 12:00').
+        time_string (str): The time string to convert.
 
     Returns:
-        int: The corresponding Unix timestamp.
+        int: The corresponding Unix timestamp in milliseconds.
     """
-    from datetime import datetime
+    normalized_time = time_string.strip()
+    possible_formats = [
+        '%Y-%m-%d %H:%M:%S',
+        '%Y-%m-%d %H:%M',
+        '%Y.%m.%d %H:%M:%S',
+        '%Y.%m.%d %H:%M',
+        '%Y-%m-%dT%H:%M:%S',
+        '%Y-%m-%dT%H:%M',
+    ]
 
-    # Parse the time string into a datetime object
-    dt_object = datetime.strptime(time_string, '%Y.%m.%d %H:%M')
+    dt_object = None
+    for time_format in possible_formats:
+        try:
+            dt_object = datetime.datetime.strptime(normalized_time, time_format)
+            break
+        except ValueError:
+            continue
+
+    if dt_object is None:
+        raise ValueError(
+            f"Unsupported datetime format: '{time_string}'. "
+            f"Expected one of: {possible_formats}"
+        )
 
     # Convert the datetime object to a Unix timestamp and return it as an integer
     return int(dt_object.timestamp()*1000)

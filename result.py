@@ -1,17 +1,14 @@
-from adx import adx_analyze_result_object
-from mcad import mcad_analyze_result_object
-from ichi import ichi_result_object
+from wskazniki import adx__chat as adxcht
+from wskazniki import mcad__chat as mcad_analyze_result_object
+from wskazniki import ichi as ichi_result_object
 import tools as tools
-from adx import adx_result_enum
-from adx import Trend
-from mcad import mcad_result_enum
-from ichi import ichi_crossover_price_kiusen_result_enum
-from ichi import ichi_crossover_price_senokuspan_result_enum
-from ichi import ichi_crossover_tenkansen_kiusen_result_enum
+from wskazniki.adx__chat import adx_result_enum
+from wskazniki.mcad__chat import mcad_result_enum
+from wskazniki.ichi import ichi_crossover_price_kiusen_result_enum
 
 
 class AnalysisResult:
-    def __init__(self, adx_analyze_result_obj : adx_analyze_result_object  , mcad_analyze_result_obj : mcad_analyze_result_object , ichi_analyze_result_obj_K : ichi_result_object , ichi_analyze_result_obj_S : ichi_result_object):
+    def __init__(self, adx_analyze_result_obj : adxcht.adx_analyze_result_object  , mcad_analyze_result_obj : mcad_analyze_result_object , ichi_analyze_result_obj_K : ichi_result_object , ichi_analyze_result_obj_S : ichi_result_object):
         self.adx_analyze_result_obj = adx_analyze_result_obj
         self.mcad_analyze_result_obj = mcad_analyze_result_obj
         self.ichi_analazy_result_object_K = ichi_analyze_result_obj_K
@@ -145,7 +142,7 @@ class AnalysisResult:
             t= tools.split_string_by_comma(self.ichi_analazy_result_object_S[i])[1]
             time = tools.int_to_datetime(t)
             n = tools.split_string_by_comma(self.ichi_analazy_result_object_S[i])[0]
-            if n == ichi_crossover_price_kiusen_result_enum.Przeciecie_do_dolu.name :
+            if n == "ichi_crossover_price_kiusen_result_enum.Przeciecie_do_dolu" :
                 dtS.append(time)
             else :
                 dtS.append(-1)

@@ -1,59 +1,66 @@
-import datetime
-import os
-from symtable import Symbol
-import time
-import login as login
-import conf as cnf
-import logging as logger
-import tools as tools
-import api as api
-from candle import Candle
-from symbolx import SymbolX
-##from database import save_to_database
-import file as file
+from __future__ import annotations
+
 import json
-from product_conf import ProductConf  # Add this line to import ProductConf
+from pathlib import Path
 
-log_file_path = tools.logger_configuration()
+from api_broker.api_MT5 import API
+from config import conf as cnf
+from config.product_conf import ProductConf
+import tools
 
 
-logger.basicConfig(filename=log_file_path, level=logger.INFO, 
-                   format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+DEFAULT_MCAD_SHORT = 12
+DEFAULT_MCAD_LONG = 26
+DEFAULT_MCAD_SIGNAL = 9
+DEFAULT_MCAD_ANGLE = 25
+DEFAULT_ADX_WINDOW = 14
+DEFAULT_ADX_THRESHOLD = 30
+DEFAULT_TENKAN = 9
+DEFAULT_KIJUN = 26
+DEFAULT_SENKOU_B = 52
 
-api = api.API(cnf.username, cnf.password)
 
-session = api.login_xstation()
-print(str(session))
+def _build_default_products(symbols: list[str]) -> list[dict]:
+    products: list[dict] = []
+    for symbol in symbols:
+        product = ProductConf(
+            symbol=symbol,
+            short_window_mcad=DEFAULT_MCAD_SHORT,
+            long_window_mcad=DEFAULT_MCAD_LONG,
+            signal_window_mcad=DEFAULT_MCAD_SIGNAL,
+            angle_mcad=DEFAULT_MCAD_ANGLE,
+            adx_window=DEFAULT_ADX_WINDOW,
+            adx_adx=DEFAULT_ADX_THRESHOLD,
+            tenkansen_period=DEFAULT_TENKAN,
+            kijunsen_period=DEFAULT_KIJUN,
+            senkouspan_period=DEFAULT_SENKOU_B,
+        )
+        products.append(product.to_dict())
+    return products
 
-logger.info(str(session)) 
 
-if session is None:
-    print('Login failed. No session returned.')
-    pass
-if session['status'] == False:
-    print('Login failed. Error code: {0}'.format(session['errorCode']))
-    pass
+def main() -> None:
+    # Configure logging handlers used across the project.
+    tools.logger_configuration()
 
-# get ssId from login response
-ssid = session['streamSessionId']
+    api_client = API(
+        login=cnf.USERNAME,
+        password=cnf.PASSWORD,
+        server=cnf.MT5_SERVER,
+        path=cnf.MT5_PATH,
+    )
 
-async def main():
-    symbols_data = await api.get_all_symbols()
-    '''
-    symb_ = symbols_data[0]
-    print(symb_)
-    if symbols_data:
-        symbols = [SymbolX.from_json for symbol in symbols_data]
-    '''
-    if symbols_data:
-        symbols = SymbolX.DeserialaizeSymbolX(symbols_data)
-        path = os.path.dirname(os.path.abspath(__file__)) + '\\products.json'
-        listOfSymbols = []
-        for symbol in symbols:
-            productConf = ProductConf(symbol.symbol)
-            listOfSymbols.append(productConf.to_dict())
-        file.save_json_to_file(json.dumps(listOfSymbols), path)
-import asyncio
+    try:
+        symbols = list(cnf.SYMBOLS_LIST)
+        products = _build_default_products(symbols)
 
-asyncio.run(main())
+        products_path = Path(__file__).resolve().parent / "config" / "products.json"
+        products_path.write_text(json.dumps(products, indent=4), encoding="utf-8")
+        print(f"Zapisano konfiguracje produktow: {products_path}")
+    finally:
+        api_client.shutdown()
+
+
+if __name__ == "__main__":
+    main()
 
