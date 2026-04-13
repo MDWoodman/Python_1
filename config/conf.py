@@ -15,7 +15,18 @@ SYMBOLS_LIST = ['STOXX50' , 'UK100', 'USTEC', 'US30']
 PERIOD = "M5"
 NUM_CANDLES = 100
 MAX_TIME_RESULT = 510
+COOLDOWN_AFTER_SL_MIN = 45
 AUTO_OPEN_TRANSACTION = True
+
+# Dynamic SL/TP configuration.
+# Available SL_METHOD values: ATR, SWING, SIGNAL_CANDLE
+SL_METHOD = "SWING"
+SL_ATR_PERIOD = 14
+SL_ATR_MULTIPLIER = 1.5
+SL_SWING_LOOKBACK = 10
+SL_SIGNAL_BUFFER = 0.0
+ENABLE_TP = False
+TP_RR_RATIO = 2.0
 
 # generate connection string for sqlite3 database
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent

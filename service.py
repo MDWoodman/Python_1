@@ -5,6 +5,7 @@ import time
 
 from pathlib import Path
 import sys
+import pandas as pd
 
 #import login as login
 from config import conf as cnf
@@ -31,6 +32,7 @@ import formacje_swiecowe as formacje_swiecowe
 import zapis_rezultatu as zapis_rezultatu
 import scenariusz as scenariusz
 import zakoncz_scenariusz as zakoncz_scenariusz
+import risk_management as risk_manager
 from audit_log import log_trade_audit_event, _format_broker_time
 
 load_current_data = False
@@ -41,7 +43,7 @@ API_CLIENT = None
 log_file_path = tools.logger_configuration()
 DEFAULT_SL_DISTANCE = 40.0
 DEFAULT_TP_DISTANCE = 80.0
-DEFAULT_LOT_SIZE = 0.01
+DEFAULT_LOT_SIZE = 0.1
 MT5_MAGIC_NUMBER = 234567
 
 
@@ -71,6 +73,14 @@ def _is_signal_within_max_time(candle_time: int, signal_time: int | None, max_ti
         return False
 
     return diff_ms <= int(max_time_result_minutes) * 60_000
+
+
+def _is_symbol_in_sl_cooldown(current_candle_time: int, runtime_state: dict, cooldown_minutes: int | None) -> bool:
+    if cooldown_minutes is None:
+        return False
+
+    last_sl_close_time = runtime_state.get("last_sl_close_time")
+    return _is_signal_within_max_time(current_candle_time, last_sl_close_time, cooldown_minutes)
 
 
 def _build_adx_for_scenario(
@@ -146,23 +156,221 @@ def _calculate_sl_tp(entry_price: float, side: str, sl_distance: float, tp_dista
     raise ValueError(f"Nieznany typ transakcji: {side}")
 
 
-def _check_sl_tp_hit(side: str, candle_high: float, candle_low: float, stop_loss: float, take_profit: float) -> str | None:
+def _compute_risk_reward(entry_price: float, stop_loss: float, take_profit: float | None, side: str) -> float | None:
+    if take_profit is None:
+        return None
+
+    side_upper = str(side or "").upper()
+    if side_upper == "BUY":
+        risk = float(entry_price) - float(stop_loss)
+        reward = float(take_profit) - float(entry_price)
+    elif side_upper == "SELL":
+        risk = float(stop_loss) - float(entry_price)
+        reward = float(entry_price) - float(take_profit)
+    else:
+        return None
+
+    if risk <= 0 or reward <= 0:
+        return None
+
+    return float(reward / risk)
+
+
+def _format_rr(rr_value: float | None) -> str:
+    if rr_value is None:
+        return "BRAK"
+    return f"{float(rr_value):.4f}"
+
+
+def _build_market_dataframe_for_risk(ordered_data) -> pd.DataFrame:
+    rows = []
+    for row in ordered_data:
+        if row is None or len(row) < 6:
+            continue
+        rows.append(
+            {
+                "open": float(row[1]),
+                "high": float(row[2]),
+                "low": float(row[3]),
+                "close": float(row[4]),
+                "tick_volume": float(row[5]),
+            }
+        )
+
+    if not rows:
+        raise ValueError("Brak poprawnych swiec do wyliczenia dynamicznego SL")
+
+    return pd.DataFrame(rows)
+
+
+def _attach_atr_column(df: pd.DataFrame, atr_period: int) -> pd.DataFrame:
+    if atr_period < 1:
+        raise ValueError("SL_ATR_PERIOD musi byc >= 1")
+
+    prev_close = df["close"].shift(1)
+    tr_df = pd.concat(
+        [
+            (df["high"] - df["low"]).abs(),
+            (df["high"] - prev_close).abs(),
+            (df["low"] - prev_close).abs(),
+        ],
+        axis=1,
+    )
+    tr = tr_df.max(axis=1)
+
+    out = df.copy()
+    out["atr"] = tr.rolling(window=int(atr_period), min_periods=int(atr_period)).mean()
+    return out
+
+
+def _calculate_dynamic_sl_tp(ordered_data, entry_price: float, side: str) -> tuple[float, float | None, str, float | None, str | None]:
+    requested_method = str(getattr(cnf, "SL_METHOD", "SWING")).upper()
+    direction = "long" if str(side).upper() == "BUY" else "short"
+    rr_ratio = float(getattr(cnf, "TP_RR_RATIO", 2.0))
+    enable_tp = bool(getattr(cnf, "ENABLE_TP", False))
+
+    try:
+        df = _build_market_dataframe_for_risk(ordered_data)
+        entry_index = len(df) - 1
+
+        if requested_method == "ATR":
+            atr_period = int(getattr(cnf, "SL_ATR_PERIOD", 14))
+            atr_multiplier = float(getattr(cnf, "SL_ATR_MULTIPLIER", 1.5))
+            df = _attach_atr_column(df, atr_period)
+            sl_price = risk_manager.calculate_sl_atr(
+                df=df,
+                entry_index=entry_index,
+                entry_price=float(entry_price),
+                direction=direction,
+                atr_multiplier=atr_multiplier,
+            )
+        elif requested_method == "SWING":
+            lookback = int(getattr(cnf, "SL_SWING_LOOKBACK", 10))
+            sl_price = risk_manager.calculate_sl_swing(
+                df=df,
+                entry_index=entry_index,
+                direction=direction,
+                buffer=0.0,
+                lookback=lookback,
+            )
+        elif requested_method == "SIGNAL_CANDLE":
+            signal_buffer = float(getattr(cnf, "SL_SIGNAL_BUFFER", 0.0))
+            sl_price = risk_manager.calculate_sl_signal_candle(
+                df=df,
+                entry_index=entry_index,
+                direction=direction,
+                buffer=signal_buffer,
+            )
+        else:
+            raise ValueError(f"Nieznana metoda SL: {requested_method}")
+
+        tp_price: float | None = None
+        if enable_tp:
+            tp_price = risk_manager.calculate_tp_rr(
+                entry_price=float(entry_price),
+                sl_price=float(sl_price),
+                direction=direction,
+                rr_ratio=rr_ratio,
+            )
+        rr_plan = _compute_risk_reward(float(entry_price), float(sl_price), tp_price, side)
+        return float(sl_price), (float(tp_price) if tp_price is not None else None), requested_method, rr_plan, None
+    except Exception as dynamic_sl_error:
+        # Safe fallback to old fixed distances.
+        sl_price, tp_price = _calculate_sl_tp(
+            entry_price=float(entry_price),
+            side=side,
+            sl_distance=DEFAULT_SL_DISTANCE,
+            tp_distance=DEFAULT_TP_DISTANCE,
+        )
+        tp_value = float(tp_price) if enable_tp else None
+        rr_plan = _compute_risk_reward(float(entry_price), float(sl_price), tp_value, side)
+        return (
+            float(sl_price),
+            tp_value,
+            f"FALLBACK_FIXED_{requested_method}",
+            rr_plan,
+            str(dynamic_sl_error),
+        )
+
+
+def _check_sl_tp_hit(side: str, candle_high: float, candle_low: float, stop_loss: float, take_profit: float | None) -> str | None:
     side_upper = str(side or "").upper()
     if side_upper == "BUY":
         if candle_low <= float(stop_loss):
             return "SL"
-        if candle_high >= float(take_profit):
+        if take_profit is not None and candle_high >= float(take_profit):
             return "TP"
         return None
 
     if side_upper == "SELL":
         if candle_high >= float(stop_loss):
             return "SL"
-        if candle_low <= float(take_profit):
+        if take_profit is not None and candle_low <= float(take_profit):
             return "TP"
         return None
 
     return None
+
+
+def _build_mt5_open_confirm_conditions(
+    scenario_conditions: str | None,
+    mt5_result: dict | None,
+    lot_size: float,
+    entry_price: float | None,
+    stop_loss: float | None,
+    take_profit: float | None,
+) -> str:
+    base_conditions = scenario_conditions or "BRAK"
+    result_data = mt5_result or {}
+    ticket = result_data.get("order") or result_data.get("deal") or "BRAK"
+    retcode = result_data.get("retcode", "BRAK")
+    mt5_price = result_data.get("price")
+    open_price = mt5_price if mt5_price is not None else (entry_price if entry_price is not None else "BRAK")
+
+    return (
+        f"{base_conditions} | FAKTYCZNE_OTWARCIE_MT5=TAK | RETCODE={retcode} | "
+        f"TICKET={ticket} | LOT={lot_size} | OPEN_PRICE={open_price} | "
+        f"SL={stop_loss if stop_loss is not None else 'BRAK'} | "
+        f"TP={take_profit if take_profit is not None else 'BRAK'}"
+    )
+
+
+def _build_mt5_close_confirm_conditions(
+    scenario_conditions: str | None,
+    mt5_close_result: dict | None,
+    mt5_ticket: int | None,
+) -> str:
+    base_conditions = scenario_conditions or "BRAK"
+    result_data = mt5_close_result or {}
+    ticket = mt5_ticket if mt5_ticket is not None else (result_data.get("order") or result_data.get("deal") or "BRAK")
+    retcode = result_data.get("retcode", "BRAK")
+    close_price = result_data.get("price", "BRAK")
+
+    return (
+        f"{base_conditions} | FAKTYCZNE_ZAMKNIECIE_MT5=TAK | RETCODE={retcode} | "
+        f"TICKET={ticket} | CLOSE_PRICE={close_price}"
+    )
+
+
+def _symbol_has_open_or_pending_transaction(symbol: str, opened_transactions_list: list[tt.TransactionTrading]) -> bool:
+    """Return True when symbol already has an active or pending open request."""
+    symbol_name = str(symbol or "")
+
+    has_local_open = any(
+        t.get_symbol() == symbol_name and t.get_status() == "OPEN"
+        for t in opened_transactions_list
+    )
+
+    has_remote_opened = (
+        status_communication.check_if_transaction_is_opened("BUY", symbol_name)
+        or status_communication.check_if_transaction_is_opened("SELL", symbol_name)
+    )
+    has_remote_pending = (
+        status_communication.check_api_signal_to_open_transaction("BUY", symbol_name)
+        or status_communication.check_api_signal_to_open_transaction("SELL", symbol_name)
+    )
+
+    return has_local_open or has_remote_opened or has_remote_pending
 
 
 
@@ -351,18 +559,56 @@ async def main():
                         _extract_latest_broker_time_ms(data),
                         symbol_state,
                     )
+
+                    current_candle_time = int(broker_time_ms) if broker_time_ms is not None else int(datetime.now().timestamp() * 1000)
+                    sl_cooldown_active = _is_symbol_in_sl_cooldown(
+                        current_candle_time=current_candle_time,
+                        runtime_state=symbol_state,
+                        cooldown_minutes=getattr(cnf, "COOLDOWN_AFTER_SL_MIN", None),
+                    )
+
+                    if cnf.AUTO_OPEN_TRANSACTION and final_signal in ("BUY", "SELL") and sl_cooldown_active:
+                        log_trade_audit_event(
+                            symbol=symbol,
+                            event_type="OPEN_SKIPPED_COOLDOWN",
+                            signal=final_signal,
+                            broker_time_ms=broker_time_ms,
+                            open_scenario_number=scenario_number,
+                            scenario_conditions=(
+                                f"{scenario_conditions} | COOLDOWN_AFTER_SL_MIN={getattr(cnf, 'COOLDOWN_AFTER_SL_MIN', None)}"
+                            ),
+                        )
+                        final_signal = "BRAK"
+                        scenario_number = None
+                        scenario_conditions = "BRAK"
+
+                    prev_signal = symbol_state.get("last_final_signal")
+                    if final_signal in ("BUY", "SELL"):
+                        symbol_state["last_final_signal"] = final_signal
+
+                    symbol_busy = _symbol_has_open_or_pending_transaction(symbol, opened_transactions_list)
+                    if cnf.AUTO_OPEN_TRANSACTION and final_signal in ("BUY", "SELL") and symbol_busy:
+                        log_trade_audit_event(
+                            symbol=symbol,
+                            event_type="OPEN_SKIPPED_SYMBOL_BUSY",
+                            signal=final_signal,
+                            broker_time_ms=broker_time_ms,
+                            open_scenario_number=scenario_number,
+                            scenario_conditions=scenario_conditions,
+                        )
                      
                             
 
                     if (
                         cnf.AUTO_OPEN_TRANSACTION
                         and final_signal == "BUY"
-                        and status_communication.check_if_transaction_is_opened("BUY", symbol) == False
+                        and prev_signal == "SELL"
+                        and not symbol_busy
                     ):
                         status_communication.send_api_request_to_open_transaction("BUY", symbol)
                         log_trade_audit_event(
                             symbol=symbol,
-                            event_type="OPEN_REQUEST_BUY",
+                            event_type="OPEN_REQUEST_SENT_BUY",
                             signal="BUY",
                             broker_time_ms=broker_time_ms,
                             open_scenario_number=scenario_number,
@@ -379,33 +625,42 @@ async def main():
                             event_type="OPEN_REQUEST_BUY",
                             )
                         if status_communication.check_api_signal_to_open_transaction("BUY", symbol):
-                            status_communication.update_api_transaction_status("BUY", symbol, "OPENED")
-                            log_trade_audit_event(
-                                symbol=symbol,
-                                event_type="OPENED_BUY",
-                                signal="BUY",
-                                broker_time_ms=broker_time_ms,
-                                open_scenario_number=scenario_number,
-                                scenario_conditions=scenario_conditions,
-                            )
                             opened_transaction = tt.TransactionTrading(symbol, cnf.PERIOD, datetime.now(), "BUY", "OPEN")
                             if len(data) > 0:
                                 entry_price = float(data[0][4])
-                                stop_loss, take_profit = _calculate_sl_tp(
+                                stop_loss, take_profit, sl_method, rr_plan, sl_error = _calculate_dynamic_sl_tp(
+                                    ordered_data=ordered_data,
                                     entry_price=entry_price,
                                     side="BUY",
-                                    sl_distance=DEFAULT_SL_DISTANCE,
-                                    tp_distance=DEFAULT_TP_DISTANCE,
                                 )
                                 opened_transaction.entry_price = entry_price
                                 opened_transaction.stop_loss = stop_loss
                                 opened_transaction.take_profit = take_profit
+                                opened_transaction.sl_method = sl_method
+                                opened_transaction.rr_plan = rr_plan
+
+                                risk_log_conditions = (
+                                    f"{scenario_conditions} | SL_METHOD={sl_method}; ENTRY={entry_price}; "
+                                    f"SL={stop_loss}; TP={take_profit}; RR_PLAN={_format_rr(rr_plan)}"
+                                )
+                                if sl_error:
+                                    risk_log_conditions = f"{risk_log_conditions}; SL_FALLBACK_REASON={sl_error}"
+
+                                log_trade_audit_event(
+                                    symbol=symbol,
+                                    event_type="OPEN_RISK_PROFILE",
+                                    signal="BUY",
+                                    broker_time_ms=broker_time_ms,
+                                    open_scenario_number=scenario_number,
+                                    scenario_conditions=risk_log_conditions,
+                                )
                             already_opened = tools.transaction_already_opened(opened_transactions_list, opened_transaction)
                         
                             
                             if already_opened == False:
                                 opened_transactions_list.append(opened_transaction)
                                 db.save_transaction_to_database(symbol, cnf.PERIOD, datetime.now(), "BUY", "OPEN")
+                                mt5_result = None
                                 if API_CLIENT is not None:
                                     try:
                                         mt5_result = API_CLIENT.open_transaction(
@@ -422,14 +677,88 @@ async def main():
                                         )
                                         if mt5_result is not None and mt5_result.get("retcode") == 10009:
                                             opened_transaction.mt5_ticket = mt5_result.get("order")
+                                            status_communication.update_api_transaction_status("BUY", symbol, "OPENED")
                                             logger.info(f"MT5 BUY opened: symbol={symbol} ticket={opened_transaction.mt5_ticket}")
                                             print(f"MT5 BUY opened: symbol={symbol} ticket={opened_transaction.mt5_ticket}")
+                                            open_confirm_conditions = _build_mt5_open_confirm_conditions(
+                                                scenario_conditions=scenario_conditions,
+                                                mt5_result=mt5_result,
+                                                lot_size=DEFAULT_LOT_SIZE,
+                                                entry_price=getattr(opened_transaction, "entry_price", None),
+                                                stop_loss=getattr(opened_transaction, "stop_loss", None),
+                                                take_profit=getattr(opened_transaction, "take_profit", None),
+                                            )
+                                            rr_real = None
+                                            try:
+                                                mt5_open_price = mt5_result.get("price")
+                                                if mt5_open_price is not None:
+                                                    rr_real = _compute_risk_reward(
+                                                        float(mt5_open_price),
+                                                        float(getattr(opened_transaction, "stop_loss", 0.0)),
+                                                        getattr(opened_transaction, "take_profit", None),
+                                                        "BUY",
+                                                    )
+                                            except Exception:
+                                                rr_real = None
+
+                                            open_confirm_conditions = (
+                                                f"{open_confirm_conditions} | "
+                                                f"SL_METHOD={getattr(opened_transaction, 'sl_method', 'BRAK')} | "
+                                                f"RR_PLAN={_format_rr(getattr(opened_transaction, 'rr_plan', None))} | "
+                                                f"RR_REAL={_format_rr(rr_real)}"
+                                            )
+                                            log_trade_audit_event(
+                                                symbol=symbol,
+                                                event_type="MT5_OPENED_BUY",
+                                                signal="BUY",
+                                                broker_time_ms=broker_time_ms,
+                                                open_scenario_number=scenario_number,
+                                                scenario_conditions=open_confirm_conditions,
+                                            )
                                         else:
+                                            opened_transaction.set_status("CLOSE")
+                                            db.update_transaction_status(symbol, cnf.PERIOD, opened_transaction.get_time(), "BUY", "CLOSE")
+                                            status_communication.update_api_transaction_status("BUY", symbol, "OPEN_FAILED")
                                             logger.warning(f"MT5 BUY open failed: symbol={symbol} result={mt5_result}")
                                             print(f"MT5 BUY open failed: symbol={symbol} result={mt5_result}")
+                                            log_trade_audit_event(
+                                                symbol=symbol,
+                                                event_type="MT5_OPEN_FAILED_BUY",
+                                                signal="BUY",
+                                                broker_time_ms=broker_time_ms,
+                                                open_scenario_number=scenario_number,
+                                                scenario_conditions=f"{scenario_conditions} | MT5_RESULT={mt5_result}",
+                                            )
                                     except Exception as mt5_err:
+                                        opened_transaction.set_status("CLOSE")
+                                        db.update_transaction_status(symbol, cnf.PERIOD, opened_transaction.get_time(), "BUY", "CLOSE")
+                                        status_communication.update_api_transaction_status("BUY", symbol, "OPEN_FAILED")
                                         logger.error(f"MT5 BUY open exception: symbol={symbol} error={mt5_err}")
                                         print(f"MT5 BUY open exception: symbol={symbol} error={mt5_err}")
+                                        log_trade_audit_event(
+                                            symbol=symbol,
+                                            event_type="MT5_OPEN_EXCEPTION_BUY",
+                                            signal="BUY",
+                                            broker_time_ms=broker_time_ms,
+                                            open_scenario_number=scenario_number,
+                                            scenario_conditions=f"{scenario_conditions} | ERROR={mt5_err}",
+                                        )
+                                else:
+                                    opened_transaction.set_status("CLOSE")
+                                    db.update_transaction_status(symbol, cnf.PERIOD, opened_transaction.get_time(), "BUY", "CLOSE")
+                                    status_communication.update_api_transaction_status("BUY", symbol, "OPEN_FAILED")
+                                    logger.warning(f"MT5 BUY open skipped: API_CLIENT is None for symbol={symbol}")
+                                    print(f"MT5 BUY open skipped: API_CLIENT is None for symbol={symbol}")
+                            else:
+                                status_communication.update_api_transaction_status("BUY", symbol, "BLOCKED_LOCAL")
+                                log_trade_audit_event(
+                                    symbol=symbol,
+                                    event_type="OPEN_BLOCKED_LOCAL_BUY",
+                                    signal="BUY",
+                                    broker_time_ms=broker_time_ms,
+                                    open_scenario_number=scenario_number,
+                                    scenario_conditions=scenario_conditions,
+                                )
                                 
                    
                         #else:
@@ -440,12 +769,13 @@ async def main():
                     if (
                         cnf.AUTO_OPEN_TRANSACTION
                         and final_signal == "SELL"
-                        and status_communication.check_if_transaction_is_opened("SELL", symbol) == False
+                        and prev_signal == "BUY"
+                        and not symbol_busy
                     ):
                         status_communication.send_api_request_to_open_transaction("SELL", symbol)
                         log_trade_audit_event(
                             symbol=symbol,
-                            event_type="OPEN_REQUEST_SELL",
+                            event_type="OPEN_REQUEST_SENT_SELL",
                             signal="SELL",
                             broker_time_ms=broker_time_ms,
                             open_scenario_number=scenario_number,
@@ -462,32 +792,41 @@ async def main():
                             event_type="OPEN_REQUEST_SELL",
                             )
                         if status_communication.check_api_signal_to_open_transaction("SELL", symbol):
-                            status_communication.update_api_transaction_status("SELL", symbol, "OPENED")
-                            log_trade_audit_event(
-                                symbol=symbol,
-                                event_type="OPENED_SELL",
-                                signal="SELL",
-                                broker_time_ms=broker_time_ms,
-                                open_scenario_number=scenario_number,
-                                scenario_conditions=scenario_conditions,
-                            )
                             opened_transaction = tt.TransactionTrading(symbol, cnf.PERIOD, datetime.now(), "SELL", "OPEN")
                             if len(data) > 0:
                                 entry_price = float(data[0][4])
-                                stop_loss, take_profit = _calculate_sl_tp(
+                                stop_loss, take_profit, sl_method, rr_plan, sl_error = _calculate_dynamic_sl_tp(
+                                    ordered_data=ordered_data,
                                     entry_price=entry_price,
                                     side="SELL",
-                                    sl_distance=DEFAULT_SL_DISTANCE,
-                                    tp_distance=DEFAULT_TP_DISTANCE,
                                 )
                                 opened_transaction.entry_price = entry_price
                                 opened_transaction.stop_loss = stop_loss
                                 opened_transaction.take_profit = take_profit
+                                opened_transaction.sl_method = sl_method
+                                opened_transaction.rr_plan = rr_plan
+
+                                risk_log_conditions = (
+                                    f"{scenario_conditions} | SL_METHOD={sl_method}; ENTRY={entry_price}; "
+                                    f"SL={stop_loss}; TP={take_profit}; RR_PLAN={_format_rr(rr_plan)}"
+                                )
+                                if sl_error:
+                                    risk_log_conditions = f"{risk_log_conditions}; SL_FALLBACK_REASON={sl_error}"
+
+                                log_trade_audit_event(
+                                    symbol=symbol,
+                                    event_type="OPEN_RISK_PROFILE",
+                                    signal="SELL",
+                                    broker_time_ms=broker_time_ms,
+                                    open_scenario_number=scenario_number,
+                                    scenario_conditions=risk_log_conditions,
+                                )
                             already_opened = tools.transaction_already_opened(opened_transactions_list, opened_transaction)
                         
                             if already_opened == False:
                                 opened_transactions_list.append(opened_transaction)
                                 db.save_transaction_to_database(symbol, cnf.PERIOD, datetime.now(), "SELL", "OPEN")
+                                mt5_result = None
                                 if API_CLIENT is not None:
                                     try:
                                         mt5_result = API_CLIENT.open_transaction(
@@ -504,14 +843,88 @@ async def main():
                                         )
                                         if mt5_result is not None and mt5_result.get("retcode") == 10009:
                                             opened_transaction.mt5_ticket = mt5_result.get("order")
+                                            status_communication.update_api_transaction_status("SELL", symbol, "OPENED")
                                             logger.info(f"MT5 SELL opened: symbol={symbol} ticket={opened_transaction.mt5_ticket}")
                                             print(f"MT5 SELL opened: symbol={symbol} ticket={opened_transaction.mt5_ticket}")
+                                            open_confirm_conditions = _build_mt5_open_confirm_conditions(
+                                                scenario_conditions=scenario_conditions,
+                                                mt5_result=mt5_result,
+                                                lot_size=DEFAULT_LOT_SIZE,
+                                                entry_price=getattr(opened_transaction, "entry_price", None),
+                                                stop_loss=getattr(opened_transaction, "stop_loss", None),
+                                                take_profit=getattr(opened_transaction, "take_profit", None),
+                                            )
+                                            rr_real = None
+                                            try:
+                                                mt5_open_price = mt5_result.get("price")
+                                                if mt5_open_price is not None:
+                                                    rr_real = _compute_risk_reward(
+                                                        float(mt5_open_price),
+                                                        float(getattr(opened_transaction, "stop_loss", 0.0)),
+                                                        getattr(opened_transaction, "take_profit", None),
+                                                        "SELL",
+                                                    )
+                                            except Exception:
+                                                rr_real = None
+
+                                            open_confirm_conditions = (
+                                                f"{open_confirm_conditions} | "
+                                                f"SL_METHOD={getattr(opened_transaction, 'sl_method', 'BRAK')} | "
+                                                f"RR_PLAN={_format_rr(getattr(opened_transaction, 'rr_plan', None))} | "
+                                                f"RR_REAL={_format_rr(rr_real)}"
+                                            )
+                                            log_trade_audit_event(
+                                                symbol=symbol,
+                                                event_type="MT5_OPENED_SELL",
+                                                signal="SELL",
+                                                broker_time_ms=broker_time_ms,
+                                                open_scenario_number=scenario_number,
+                                                scenario_conditions=open_confirm_conditions,
+                                            )
                                         else:
+                                            opened_transaction.set_status("CLOSE")
+                                            db.update_transaction_status(symbol, cnf.PERIOD, opened_transaction.get_time(), "SELL", "CLOSE")
+                                            status_communication.update_api_transaction_status("SELL", symbol, "OPEN_FAILED")
                                             logger.warning(f"MT5 SELL open failed: symbol={symbol} result={mt5_result}")
                                             print(f"MT5 SELL open failed: symbol={symbol} result={mt5_result}")
+                                            log_trade_audit_event(
+                                                symbol=symbol,
+                                                event_type="MT5_OPEN_FAILED_SELL",
+                                                signal="SELL",
+                                                broker_time_ms=broker_time_ms,
+                                                open_scenario_number=scenario_number,
+                                                scenario_conditions=f"{scenario_conditions} | MT5_RESULT={mt5_result}",
+                                            )
                                     except Exception as mt5_err:
+                                        opened_transaction.set_status("CLOSE")
+                                        db.update_transaction_status(symbol, cnf.PERIOD, opened_transaction.get_time(), "SELL", "CLOSE")
+                                        status_communication.update_api_transaction_status("SELL", symbol, "OPEN_FAILED")
                                         logger.error(f"MT5 SELL open exception: symbol={symbol} error={mt5_err}")
                                         print(f"MT5 SELL open exception: symbol={symbol} error={mt5_err}")
+                                        log_trade_audit_event(
+                                            symbol=symbol,
+                                            event_type="MT5_OPEN_EXCEPTION_SELL",
+                                            signal="SELL",
+                                            broker_time_ms=broker_time_ms,
+                                            open_scenario_number=scenario_number,
+                                            scenario_conditions=f"{scenario_conditions} | ERROR={mt5_err}",
+                                        )
+                                else:
+                                    opened_transaction.set_status("CLOSE")
+                                    db.update_transaction_status(symbol, cnf.PERIOD, opened_transaction.get_time(), "SELL", "CLOSE")
+                                    status_communication.update_api_transaction_status("SELL", symbol, "OPEN_FAILED")
+                                    logger.warning(f"MT5 SELL open skipped: API_CLIENT is None for symbol={symbol}")
+                                    print(f"MT5 SELL open skipped: API_CLIENT is None for symbol={symbol}")
+                            else:
+                                status_communication.update_api_transaction_status("SELL", symbol, "BLOCKED_LOCAL")
+                                log_trade_audit_event(
+                                    symbol=symbol,
+                                    event_type="OPEN_BLOCKED_LOCAL_SELL",
+                                    signal="SELL",
+                                    broker_time_ms=broker_time_ms,
+                                    open_scenario_number=scenario_number,
+                                    scenario_conditions=scenario_conditions,
+                                )
                        # else:
                         #    print("No time S result")
                         pass
@@ -539,13 +952,13 @@ async def main():
                         close_result = {"close": False, "scenario_number": None, "scenario_conditions": "BRAK"}
                         close_event_type = "CLOSE_SIGNAL"
 
-                        if len(data) > 0 and hasattr(opened_transaction, "stop_loss") and hasattr(opened_transaction, "take_profit"):
+                        if len(data) > 0 and hasattr(opened_transaction, "stop_loss"):
                             sl_tp_hit = _check_sl_tp_hit(
                                 side=close_type,
                                 candle_high=float(data[0][2]),
                                 candle_low=float(data[0][3]),
                                 stop_loss=float(opened_transaction.stop_loss),
-                                take_profit=float(opened_transaction.take_profit),
+                                take_profit=getattr(opened_transaction, "take_profit", None),
                             )
                             if sl_tp_hit == "SL":
                                 close_result = {
@@ -584,6 +997,8 @@ async def main():
 
                         close_scenario = close_result.get("scenario_number")
                         broker_time_ms = _extract_latest_broker_time_ms(data)
+                        if close_event_type == "CLOSE_SL" and broker_time_ms is not None:
+                            symbol_state["last_sl_close_time"] = int(broker_time_ms)
                         print(
                             f"ZAMKNIECIE SCENARIUSZ | symbol={opened_transaction.get_symbol()} | "
                             f"data_godzina={datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | "
@@ -638,13 +1053,56 @@ async def main():
                                     if mt5_close_result is not None and mt5_close_result.get("retcode") == 10009:
                                         logger.info(f"MT5 position closed: symbol={opened_transaction.get_symbol()} ticket={mt5_ticket}")
                                         print(f"MT5 position closed: symbol={opened_transaction.get_symbol()} ticket={mt5_ticket}")
+                                        close_confirm_conditions = _build_mt5_close_confirm_conditions(
+                                            scenario_conditions=close_result.get("scenario_conditions"),
+                                            mt5_close_result=mt5_close_result,
+                                            mt5_ticket=mt5_ticket,
+                                        )
+                                        log_trade_audit_event(
+                                            symbol=opened_transaction.get_symbol(),
+                                            event_type=f"MT5_CLOSED_{close_type}",
+                                            signal=close_type,
+                                            broker_time_ms=broker_time_ms,
+                                            close_scenario_number=close_scenario,
+                                            scenario_conditions=close_confirm_conditions,
+                                        )
                                     else:
                                         logger.warning(f"MT5 close failed: symbol={opened_transaction.get_symbol()} ticket={mt5_ticket} result={mt5_close_result}")
                                         print(f"MT5 close failed: symbol={opened_transaction.get_symbol()} ticket={mt5_ticket} result={mt5_close_result}")
+                                        log_trade_audit_event(
+                                            symbol=opened_transaction.get_symbol(),
+                                            event_type=f"MT5_CLOSE_FAILED_{close_type}",
+                                            signal=close_type,
+                                            broker_time_ms=broker_time_ms,
+                                            close_scenario_number=close_scenario,
+                                            scenario_conditions=f"{close_result.get('scenario_conditions')} | MT5_RESULT={mt5_close_result}",
+                                        )
                                 except Exception as mt5_close_err:
                                     logger.error(f"MT5 close exception: symbol={opened_transaction.get_symbol()} ticket={mt5_ticket} error={mt5_close_err}")
                                     print(f"MT5 close exception: symbol={opened_transaction.get_symbol()} ticket={mt5_ticket} error={mt5_close_err}")
+                                    log_trade_audit_event(
+                                        symbol=opened_transaction.get_symbol(),
+                                        event_type=f"MT5_CLOSE_EXCEPTION_{close_type}",
+                                        signal=close_type,
+                                        broker_time_ms=broker_time_ms,
+                                        close_scenario_number=close_scenario,
+                                        scenario_conditions=f"{close_result.get('scenario_conditions')} | ERROR={mt5_close_err}",
+                                    )
+                            else:
+                                log_trade_audit_event(
+                                    symbol=opened_transaction.get_symbol(),
+                                    event_type=f"MT5_CLOSE_SKIPPED_{close_type}",
+                                    signal=close_type,
+                                    broker_time_ms=broker_time_ms,
+                                    close_scenario_number=close_scenario,
+                                    scenario_conditions=(
+                                        f"{close_result.get('scenario_conditions')} | "
+                                        f"API_CLIENT={'OK' if API_CLIENT is not None else 'NONE'} | "
+                                        f"MT5_TICKET={mt5_ticket if mt5_ticket is not None else 'BRAK'}"
+                                    ),
+                                )
                             opened_transaction.set_status("CLOSE")
+                            status_communication.update_api_transaction_status(close_type, opened_transaction.get_symbol(), "CLOSED")
                             log_trade_audit_event(
                                 symbol=opened_transaction.get_symbol(),
                                 event_type=f"{close_event_type}_CONFIRMED",

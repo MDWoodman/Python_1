@@ -7,6 +7,10 @@ from wskazniki import adx__chat as adxcht
 from wskazniki import mcad__chat as mcad
 
 
+M5_SCENARIO_LIMITS = {"strict": 20, "medium": 35, "relaxed": 50}
+MCAD_FRESH_CROSS_MAX_MINUTES = 15
+
+
 def _has_ichi_buy_signal(ichimoku_result_k: list[str]) -> bool:
     if not ichimoku_result_k:
         return False
@@ -167,6 +171,9 @@ def _signal_time_window_minutes_for_side(
 def _scenario_time_limits(period: str | None, max_time_result_minutes: int | None) -> dict[str, int]:
     period_upper = str(period or "").upper()
 
+    if period_upper == "M5":
+        return M5_SCENARIO_LIMITS.copy()
+
     # H1/H4 are slower systems. Keep wider windows to avoid rejecting valid confirmations.
     if period_upper == "H1":
         return {"strict": 180, "medium": 360, "relaxed": 720}
@@ -243,6 +250,27 @@ def _mcad_is_sell(mcad_analyze_result_obj: Any) -> bool:
     return getattr(result, "name", "") == "Spadek_przeciecie"
 
 
+def _mcad_cross_is_fresh(mcad_analyze_result_obj: Any, max_age_minutes: int) -> bool:
+    if mcad_analyze_result_obj is None:
+        return False
+
+    get_raw_cross_time = getattr(mcad_analyze_result_obj, "get_raw_cross_time", None)
+    get_time = getattr(mcad_analyze_result_obj, "get_time", None)
+    if get_raw_cross_time is None or get_time is None:
+        return False
+
+    raw_cross_time = get_raw_cross_time()
+    last_time = get_time()
+    if raw_cross_time is None or last_time is None:
+        return False
+
+    age_minutes = (int(last_time) - int(raw_cross_time)) / 60000.0
+    if age_minutes < 0:
+        return False
+
+    return age_minutes <= float(max_age_minutes)
+
+
 def get_trade_signal(
     adx_analyze_result_obj: tuple[Any, Any],
     mcad_analyze_result_obj: Any,
@@ -261,9 +289,21 @@ def get_trade_signal(
 
     mcad_buy = _mcad_is_buy(mcad_analyze_result_obj)
     mcad_sell = _mcad_is_sell(mcad_analyze_result_obj)
+    mcad_fresh = _mcad_cross_is_fresh(mcad_analyze_result_obj, MCAD_FRESH_CROSS_MAX_MINUTES)
 
     ichi_buy = _has_ichi_buy_signal(ichimoku_result_k)
     ichi_sell = _has_ichi_sell_signal(ichimoku_result_s)
+
+    # Ambiguous Ichimoku state: skip entries when both sides are signaled at once.
+    if ichi_buy and ichi_sell:
+        return {
+            "signal": None,
+            "scenario_number": None,
+            "scenario_conditions": (
+                f"NO_MATCH | PERIOD={period}; LIMITS={limits}; AMBIGUOUS_ICHI=True; "
+                f"ICHI_BUY={ichi_buy}; ICHI_SELL={ichi_sell}"
+            ),
+        }
 
     buy_window = _signal_time_window_minutes_for_side(
         adx_analyze_result_obj,
@@ -283,11 +323,12 @@ def get_trade_signal(
     base_conditions = (
         f"PERIOD={period}; LIMITS={limits}; ADX_BUY={adx_buy}; ADX_SELL={adx_sell}; "
         f"ADX_INC={adx_inc}; ADX_DEC={adx_dec}; MCAD_BUY={mcad_buy}; MCAD_SELL={mcad_sell}; "
-        f"ICHI_BUY={ichi_buy}; ICHI_SELL={ichi_sell}; BUY_WINDOW_MIN={buy_window}; SELL_WINDOW_MIN={sell_window}"
+        f"MCAD_FRESH={mcad_fresh}; ICHI_BUY={ichi_buy}; ICHI_SELL={ichi_sell}; "
+        f"BUY_WINDOW_MIN={buy_window}; SELL_WINDOW_MIN={sell_window}"
     )
 
-    # SC1 (BUY): ADX(DI cross) + MCAD (bez filtra ADX trend/threshold).
-    if adx_buy and mcad_buy and not ichi_sell and _within_window(buy_window, limits["strict"]):
+    # SC1 (BUY): ADX(DI cross) + MCAD with ADX momentum and fresh MCAD cross.
+    if adx_buy and adx_inc and mcad_buy and mcad_fresh and not ichi_sell and _within_window(buy_window, limits["strict"]):
         return {
             "signal": "BUY",
             "scenario_number": 1,
@@ -318,8 +359,8 @@ def get_trade_signal(
             "scenario_conditions": f"SC4 BUY (ICHI only, relaxed) | {base_conditions}",
         }
 
-    # SC5 (SELL): ADX(DI cross) + MCAD (bez filtra ADX trend/threshold).
-    if adx_sell and mcad_sell and not ichi_buy and _within_window(sell_window, limits["strict"]):
+    # SC5 (SELL): ADX(DI cross) + MCAD with ADX momentum and fresh MCAD cross.
+    if adx_sell and adx_inc and mcad_sell and mcad_fresh and not ichi_buy and _within_window(sell_window, limits["strict"]):
         return {
             "signal": "SELL",
             "scenario_number": 5,
