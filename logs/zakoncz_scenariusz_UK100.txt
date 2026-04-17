@@ -1,2 +1,5 @@
-ZAMKNIECIE SCENARIUSZ | symbol=UK100 | data_godzina=2026-04-13 08:11:41 | typ=BUY | numer_scenariusza=C1 | godzina_brokera=2026-04-13 09:05:00
-ZAMKNIECIE SCENARIUSZ | symbol=UK100 | data_godzina=2026-04-13 15:00:17 | typ=SELL | numer_scenariusza=C4 | godzina_brokera=2026-04-13 15:55:00
+ZAMKNIECIE SCENARIUSZ | symbol=UK100 | data_godzina=2026-04-17 05:05:39 | typ=BUY | numer_scenariusza=C1 | godzina_brokera=2026-04-17 06:00:00
+ZAMKNIECIE SCENARIUSZ | symbol=UK100 | data_godzina=2026-04-17 06:26:33 | typ=SELL | numer_scenariusza=C4 | godzina_brokera=2026-04-17 07:20:00
+ZAMKNIECIE SCENARIUSZ | symbol=UK100 | data_godzina=2026-04-17 08:15:16 | typ=BUY | numer_scenariusza=C1 | godzina_brokera=2026-04-17 09:10:00
+ZAMKNIECIE SCENARIUSZ | symbol=UK100 | data_godzina=2026-04-17 11:02:10 | typ=SELL | numer_scenariusza=C4 | godzina_brokera=2026-04-17 11:55:00
+ZAMKNIECIE SCENARIUSZ | symbol=UK100 | data_godzina=2026-04-17 12:06:19 | typ=BUY | numer_scenariusza=C1 | godzina_brokera=2026-04-17 13:00:00

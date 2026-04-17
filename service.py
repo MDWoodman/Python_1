@@ -223,8 +223,13 @@ def _attach_atr_column(df: pd.DataFrame, atr_period: int) -> pd.DataFrame:
     return out
 
 
-def _calculate_dynamic_sl_tp(ordered_data, entry_price: float, side: str) -> tuple[float, float | None, str, float | None, str | None]:
-    requested_method = str(getattr(cnf, "SL_METHOD", "SWING")).upper()
+def _calculate_dynamic_sl_tp(
+    ordered_data,
+    entry_price: float,
+    side: str,
+    scenario_number: int | None,
+) -> tuple[float | None, float | None, str, float | None, str | None]:
+    requested_method = "SCENARIO_INVALIDATION"
     direction = "long" if str(side).upper() == "BUY" else "short"
     rr_ratio = float(getattr(cnf, "TP_RR_RATIO", 2.0))
     enable_tp = bool(getattr(cnf, "ENABLE_TP", False))
@@ -233,36 +238,26 @@ def _calculate_dynamic_sl_tp(ordered_data, entry_price: float, side: str) -> tup
         df = _build_market_dataframe_for_risk(ordered_data)
         entry_index = len(df) - 1
 
-        if requested_method == "ATR":
-            atr_period = int(getattr(cnf, "SL_ATR_PERIOD", 14))
-            atr_multiplier = float(getattr(cnf, "SL_ATR_MULTIPLIER", 1.5))
-            df = _attach_atr_column(df, atr_period)
-            sl_price = risk_manager.calculate_sl_atr(
-                df=df,
-                entry_index=entry_index,
-                entry_price=float(entry_price),
-                direction=direction,
-                atr_multiplier=atr_multiplier,
-            )
-        elif requested_method == "SWING":
-            lookback = int(getattr(cnf, "SL_SWING_LOOKBACK", 10))
-            sl_price = risk_manager.calculate_sl_swing(
-                df=df,
-                entry_index=entry_index,
-                direction=direction,
-                buffer=0.0,
-                lookback=lookback,
-            )
-        elif requested_method == "SIGNAL_CANDLE":
-            signal_buffer = float(getattr(cnf, "SL_SIGNAL_BUFFER", 0.0))
-            sl_price = risk_manager.calculate_sl_signal_candle(
-                df=df,
-                entry_index=entry_index,
-                direction=direction,
-                buffer=signal_buffer,
-            )
-        else:
-            raise ValueError(f"Nieznana metoda SL: {requested_method}")
+        scenario_sl = risk_manager.calculate_sl_by_scenario(
+            df=df,
+            entry_index=entry_index,
+            side=str(side).upper(),
+            scenario_number=scenario_number,
+            current_price=float(entry_price),
+            use_atr_buffer_if_available=bool(getattr(cnf, "USE_ATR_BUFFER_IF_AVAILABLE", True)),
+            atr_buffer_multiplier=float(getattr(cnf, "ATR_BUFFER_MULTIPLIER", 1.0)),
+            default_buffer_percent=float(getattr(cnf, "DEFAULT_BUFFER_PERCENT", 0.001)),
+            allow_weak_scenarios=bool(getattr(cnf, "ALLOW_WEAK_SCENARIOS", True)),
+            weak_scenario_buffer_multiplier=float(getattr(cnf, "WEAK_SCENARIO_BUFFER_MULTIPLIER", 1.5)),
+            swing_lookback=int(getattr(cnf, "SL_SWING_LOOKBACK", 10)),
+            atr_period=int(getattr(cnf, "SL_ATR_PERIOD", 14)),
+        )
+
+        if scenario_sl.get("status") == "SKIP":
+            return None, None, f"SCENARIO_SKIP_{scenario_sl.get('anchor_type', 'UNKNOWN')}", None, scenario_sl.get("reason")
+
+        sl_price = float(scenario_sl["stop_loss"])
+        requested_method = f"SCENARIO_{scenario_sl.get('anchor_type', 'UNKNOWN')}"
 
         tp_price: float | None = None
         if enable_tp:
@@ -632,6 +627,7 @@ async def main():
                                     ordered_data=ordered_data,
                                     entry_price=entry_price,
                                     side="BUY",
+                                    scenario_number=scenario_number,
                                 )
                                 opened_transaction.entry_price = entry_price
                                 opened_transaction.stop_loss = stop_loss
@@ -654,6 +650,17 @@ async def main():
                                     open_scenario_number=scenario_number,
                                     scenario_conditions=risk_log_conditions,
                                 )
+                                if stop_loss is None:
+                                    status_communication.update_api_transaction_status("BUY", symbol, "OPEN_SKIPPED_RISK")
+                                    log_trade_audit_event(
+                                        symbol=symbol,
+                                        event_type="OPEN_SKIPPED_RISK_BUY",
+                                        signal="BUY",
+                                        broker_time_ms=broker_time_ms,
+                                        open_scenario_number=scenario_number,
+                                        scenario_conditions=risk_log_conditions,
+                                    )
+                                    continue
                             already_opened = tools.transaction_already_opened(opened_transactions_list, opened_transaction)
                         
                             
@@ -799,6 +806,7 @@ async def main():
                                     ordered_data=ordered_data,
                                     entry_price=entry_price,
                                     side="SELL",
+                                    scenario_number=scenario_number,
                                 )
                                 opened_transaction.entry_price = entry_price
                                 opened_transaction.stop_loss = stop_loss
@@ -821,6 +829,17 @@ async def main():
                                     open_scenario_number=scenario_number,
                                     scenario_conditions=risk_log_conditions,
                                 )
+                                if stop_loss is None:
+                                    status_communication.update_api_transaction_status("SELL", symbol, "OPEN_SKIPPED_RISK")
+                                    log_trade_audit_event(
+                                        symbol=symbol,
+                                        event_type="OPEN_SKIPPED_RISK_SELL",
+                                        signal="SELL",
+                                        broker_time_ms=broker_time_ms,
+                                        open_scenario_number=scenario_number,
+                                        scenario_conditions=risk_log_conditions,
+                                    )
+                                    continue
                             already_opened = tools.transaction_already_opened(opened_transactions_list, opened_transaction)
                         
                             if already_opened == False:

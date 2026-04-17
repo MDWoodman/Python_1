@@ -6,7 +6,7 @@ multiple Stop Loss and Take Profit algorithms.
 
 from __future__ import annotations
 
-from typing import Iterable
+from typing import Any, Iterable
 
 import pandas as pd
 
@@ -201,6 +201,221 @@ def calculate_sl_signal_candle(
     if direction == "long":
         return float(signal_row["low"]) - buffer
     return float(signal_row["high"]) + buffer
+
+
+def _rolling_midpoint(high: pd.Series, low: pd.Series, period: int) -> pd.Series:
+    highest = high.rolling(window=int(period), min_periods=int(period)).max()
+    lowest = low.rolling(window=int(period), min_periods=int(period)).min()
+    return (highest + lowest) / 2.0
+
+
+def _value_or_none(value: Any) -> float | None:
+    if pd.isna(value):
+        return None
+    return float(value)
+
+
+def _compute_atr_value(df: pd.DataFrame, entry_index: int, atr_period: int) -> float | None:
+    if atr_period < 1:
+        return None
+
+    if "atr" in df.columns:
+        atr_value = _value_or_none(df.iloc[entry_index].get("atr"))
+        if atr_value is not None and atr_value > 0:
+            return atr_value
+
+    prev_close = df["close"].shift(1)
+    tr_df = pd.concat(
+        [
+            (df["high"] - df["low"]).abs(),
+            (df["high"] - prev_close).abs(),
+            (df["low"] - prev_close).abs(),
+        ],
+        axis=1,
+    )
+    tr = tr_df.max(axis=1)
+    atr_series = tr.rolling(window=int(atr_period), min_periods=int(atr_period)).mean()
+    atr_value = _value_or_none(atr_series.iloc[entry_index])
+    if atr_value is None or atr_value <= 0:
+        return None
+    return float(atr_value)
+
+
+def _extract_anchor_levels(
+    df: pd.DataFrame,
+    entry_index: int,
+    swing_lookback: int,
+) -> dict[str, float | None]:
+    _prepare_common(df, entry_index, "long")
+    _validate_lookback(swing_lookback)
+
+    window_start = _get_window_start(entry_index, swing_lookback)
+    window = df.iloc[window_start : entry_index + 1]
+    row = df.iloc[entry_index]
+
+    tenkan = _rolling_midpoint(df["high"], df["low"], 9)
+    kijun = _rolling_midpoint(df["high"], df["low"], 26)
+    span_a_raw = (tenkan + kijun) / 2.0
+    span_b_raw = _rolling_midpoint(df["high"], df["low"], 52)
+
+    kijun_value = _value_or_none(kijun.iloc[entry_index])
+    span_a_value = _value_or_none(span_a_raw.iloc[entry_index])
+    span_b_value = _value_or_none(span_b_raw.iloc[entry_index])
+
+    cloud_low = None
+    cloud_high = None
+    if span_a_value is not None and span_b_value is not None:
+        cloud_low = min(span_a_value, span_b_value)
+        cloud_high = max(span_a_value, span_b_value)
+
+    return {
+        "kijun": kijun_value,
+        "last_swing_low": float(window["low"].min()) if not window.empty else None,
+        "last_swing_high": float(window["high"].max()) if not window.empty else None,
+        "signal_candle_low": float(row["low"]),
+        "signal_candle_high": float(row["high"]),
+        "kumo_top": cloud_high,
+        "kumo_bottom": cloud_low,
+        "cloud_low": cloud_low,
+        "cloud_high": cloud_high,
+    }
+
+
+def calculate_sl_by_scenario(
+    df: pd.DataFrame,
+    entry_index: int,
+    side: str,
+    scenario_number: int | None,
+    current_price: float,
+    use_atr_buffer_if_available: bool = True,
+    atr_buffer_multiplier: float = 1.0,
+    default_buffer_percent: float = 0.001,
+    allow_weak_scenarios: bool = True,
+    weak_scenario_buffer_multiplier: float = 1.5,
+    swing_lookback: int = 10,
+    atr_period: int = 14,
+) -> dict[str, Any]:
+    """Calculate SL from scenario invalidation anchors (SC1-SC8)."""
+    _prepare_common(df, entry_index, "long")
+    _validate_positive(current_price, "current_price")
+    _validate_positive(atr_buffer_multiplier, "atr_buffer_multiplier")
+    _validate_positive(default_buffer_percent, "default_buffer_percent")
+    _validate_positive(weak_scenario_buffer_multiplier, "weak_scenario_buffer_multiplier")
+
+    side_upper = str(side or "").upper()
+    if side_upper not in {"BUY", "SELL"}:
+        raise ValueError("side must be BUY or SELL")
+
+    if scenario_number is None:
+        raise ValueError("scenario_number is required for scenario-based SL")
+
+    anchors = _extract_anchor_levels(df=df, entry_index=entry_index, swing_lookback=swing_lookback)
+
+    atr_value = _compute_atr_value(df=df, entry_index=entry_index, atr_period=atr_period)
+    if use_atr_buffer_if_available and atr_value is not None:
+        buffer = float(atr_value) * float(atr_buffer_multiplier)
+        buffer_source = "ATR"
+    else:
+        buffer = float(current_price) * float(default_buffer_percent)
+        buffer_source = "PERCENT"
+
+    scenario = int(scenario_number)
+
+    if scenario == 1 and side_upper == "BUY":
+        candidates = [anchors["kijun"], anchors["last_swing_low"]]
+        if any(c is None for c in candidates):
+            raise ValueError("SC1 BUY requires kijun and last_swing_low")
+        base_anchor = min(float(candidates[0]), float(candidates[1]))
+        final_sl = base_anchor - buffer
+        anchor_type = "KIJUN_AND_SWING_LOW"
+
+    elif scenario == 2 and side_upper == "BUY":
+        candidates = [anchors["cloud_low"], anchors["last_swing_low"]]
+        if any(c is None for c in candidates):
+            raise ValueError("SC2 BUY requires cloud_low and last_swing_low")
+        base_anchor = min(float(candidates[0]), float(candidates[1]))
+        final_sl = base_anchor - buffer
+        anchor_type = "BELOW_KUMO_OR_SWING_LOW"
+
+    elif scenario == 3 and side_upper == "BUY":
+        candidates = [anchors["last_swing_low"], anchors["signal_candle_low"]]
+        if any(c is None for c in candidates):
+            raise ValueError("SC3 BUY requires last_swing_low and signal_candle_low")
+        base_anchor = min(float(candidates[0]), float(candidates[1]))
+        final_sl = base_anchor - buffer
+        anchor_type = "SWING_LOW_AND_SIGNAL_CANDLE_LOW"
+
+    elif scenario == 4 and side_upper == "BUY":
+        cloud_low = anchors["cloud_low"]
+        if cloud_low is None:
+            raise ValueError("SC4 BUY requires cloud_low")
+        if not allow_weak_scenarios:
+            return {
+                "status": "SKIP",
+                "reason": "SC4 BUY skipped because allow_weak_scenarios=False",
+                "anchor_type": "WIDE_BELOW_KUMO",
+                "buffer_source": buffer_source,
+            }
+        enlarged_buffer = buffer * weak_scenario_buffer_multiplier
+        base_anchor = float(cloud_low)
+        final_sl = base_anchor - enlarged_buffer
+        anchor_type = "WIDE_BELOW_KUMO"
+        buffer = float(enlarged_buffer)
+
+    elif scenario == 5 and side_upper == "SELL":
+        candidates = [anchors["kijun"], anchors["last_swing_high"]]
+        if any(c is None for c in candidates):
+            raise ValueError("SC5 SELL requires kijun and last_swing_high")
+        base_anchor = max(float(candidates[0]), float(candidates[1]))
+        final_sl = base_anchor + buffer
+        anchor_type = "KIJUN_AND_SWING_HIGH"
+
+    elif scenario == 6 and side_upper == "SELL":
+        candidates = [anchors["cloud_high"], anchors["last_swing_high"]]
+        if any(c is None for c in candidates):
+            raise ValueError("SC6 SELL requires cloud_high and last_swing_high")
+        base_anchor = max(float(candidates[0]), float(candidates[1]))
+        final_sl = base_anchor + buffer
+        anchor_type = "ABOVE_KUMO_OR_SWING_HIGH"
+
+    elif scenario == 7 and side_upper == "SELL":
+        candidates = [anchors["last_swing_high"], anchors["signal_candle_high"]]
+        if any(c is None for c in candidates):
+            raise ValueError("SC7 SELL requires last_swing_high and signal_candle_high")
+        base_anchor = max(float(candidates[0]), float(candidates[1]))
+        final_sl = base_anchor + buffer
+        anchor_type = "SWING_HIGH_AND_SIGNAL_CANDLE_HIGH"
+
+    elif scenario == 8 and side_upper == "SELL":
+        cloud_high = anchors["cloud_high"]
+        if cloud_high is None:
+            raise ValueError("SC8 SELL requires cloud_high")
+        if not allow_weak_scenarios:
+            return {
+                "status": "SKIP",
+                "reason": "SC8 SELL skipped because allow_weak_scenarios=False",
+                "anchor_type": "WIDE_ABOVE_KUMO",
+                "buffer_source": buffer_source,
+            }
+        enlarged_buffer = buffer * weak_scenario_buffer_multiplier
+        base_anchor = float(cloud_high)
+        final_sl = base_anchor + enlarged_buffer
+        anchor_type = "WIDE_ABOVE_KUMO"
+        buffer = float(enlarged_buffer)
+
+    else:
+        raise ValueError(
+            f"Scenario {scenario} and side {side_upper} combination is unsupported for scenario SL"
+        )
+
+    return {
+        "status": "OK",
+        "stop_loss": float(final_sl),
+        "anchor_base": float(base_anchor),
+        "anchor_type": anchor_type,
+        "buffer": float(buffer),
+        "buffer_source": buffer_source,
+    }
 
 
 def calculate_sl_support_resistance(
