@@ -1,7 +1,8 @@
-from datetime import datetime, timedelta
+﻿from datetime import datetime, timedelta
 import os
 from symtable import Symbol
 import time
+from typing import Any
 
 from pathlib import Path
 import sys
@@ -43,7 +44,7 @@ API_CLIENT = None
 log_file_path = tools.logger_configuration()
 DEFAULT_SL_DISTANCE = 40.0
 DEFAULT_TP_DISTANCE = 80.0
-DEFAULT_LOT_SIZE = 0.1
+DEFAULT_LOT_SIZE = 0.01
 MT5_MAGIC_NUMBER = 234567
 
 
@@ -368,6 +369,36 @@ def _symbol_has_open_or_pending_transaction(symbol: str, opened_transactions_lis
     return has_local_open or has_remote_opened or has_remote_pending
 
 
+def _try_reinitialize_api_client(reason: str) -> bool:
+    """Try to rebuild MT5 API client after connectivity issues; return True on success."""
+    global API_CLIENT
+
+    try:
+        if API_CLIENT is not None:
+            try:
+                API_CLIENT.shutdown()
+            except Exception:
+                pass
+
+        API_CLIENT = api_mt5.API(
+            login=cnf.USERNAME,
+            password=cnf.PASSWORD,
+            server=cnf.MT5_SERVER,
+            path=cnf.MT5_PATH,
+        )
+        logger.info(
+            f"INTERNET_RECOVERY | action=API_REINITIALIZED | data_godzina={datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | reason={reason}"
+        )
+        return True
+    except Exception as api_error:
+        logger.warning(
+            f"INTERNET_RECOVERY | action=API_REINIT_FAILED | data_godzina={datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | "
+            f"reason={reason} | error={api_error}"
+        )
+        API_CLIENT = None
+        return False
+
+
 
 # logger.basicConfig(filename=log_file_path, level=logger.INFO, 
 #                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -418,8 +449,21 @@ async def main():
     opened_transactions_list = []
     num = 0
     symbol_runtime_state = {}
+    last_heartbeat_log = 0.0
+    internet_outage_mode = False
+    consecutive_full_fetch_failures = 0
+    last_api_reinit_attempt_ts = 0.0
+    logger.info(f"SERVICE_START | data_godzina={datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | period={cnf.PERIOD}")
     while True:
         try:
+            now_ts = time.time()
+            if (now_ts - last_heartbeat_log) >= 60:
+                logger.info(
+                    f"HEARTBEAT | data_godzina={datetime.now().strftime('%Y-%m-%d %H:%M:%S')} "
+                    f"| period={cnf.PERIOD} | symbols={len(cnf.SYMBOLS_LIST)}"
+                )
+                last_heartbeat_log = now_ts
+
             sleep_seconds = get_main_loop_sleep_seconds(cnf.PERIOD)
             num_candles = 1
             start_time = None
@@ -428,6 +472,7 @@ async def main():
             multiplication = tools.calculate_multiplication_v2(cnf.PERIOD)
             num = num+1
             run = True
+            symbol_fetch_successes = 0
             if run == True:
               for symbol in cnf.SYMBOLS_LIST:
                 try:
@@ -444,12 +489,19 @@ async def main():
                     saved = fetch_and_save_last_candle(symbol, period)
                     if not saved:
                         print(f"Failed to fetch and save candlestick data for {symbol}.")
+                        logger.warning(
+                            f"NO_DATA_RETRY | symbol={symbol} | data_godzina={datetime.now().strftime('%Y-%m-%d %H:%M:%S')} "
+                            f"| reason=fetch_failed"
+                        )
+                        continue
+
+                    symbol_fetch_successes += 1
 
                     data = db.get_last_candle_from_database(symbol, period, cnf.NUM_CANDLES) or []
                     broker_time_ms = _extract_latest_broker_time_ms(data)
                    
                     if len(data) == 0:
-                        logger.warning(f"Brak świec w bazie dla {symbol} po próbie zapisu. Pomijam iterację symbolu.")
+                        logger.warning(f"Brak Ĺ›wiec w bazie dla {symbol} po prĂłbie zapisu. Pomijam iteracjÄ™ symbolu.")
                         continue
 
                 
@@ -551,6 +603,7 @@ async def main():
                         mcad_analyze_result_obj,
                         ichimoku_result_K,
                         ichimoku_result_S,
+                        pattern_signal,
                         _extract_latest_broker_time_ms(data),
                         symbol_state,
                     )
@@ -578,9 +631,6 @@ async def main():
                         scenario_conditions = "BRAK"
 
                     prev_signal = symbol_state.get("last_final_signal")
-                    if final_signal in ("BUY", "SELL"):
-                        symbol_state["last_final_signal"] = final_signal
-
                     symbol_busy = _symbol_has_open_or_pending_transaction(symbol, opened_transactions_list)
                     if cnf.AUTO_OPEN_TRANSACTION and final_signal in ("BUY", "SELL") and symbol_busy:
                         log_trade_audit_event(
@@ -722,6 +772,7 @@ async def main():
                                                 open_scenario_number=scenario_number,
                                                 scenario_conditions=open_confirm_conditions,
                                             )
+                                                symbol_state["last_final_signal"] = "BUY"
                                         else:
                                             opened_transaction.set_status("CLOSE")
                                             db.update_transaction_status(symbol, cnf.PERIOD, opened_transaction.get_time(), "BUY", "CLOSE")
@@ -900,6 +951,7 @@ async def main():
                                                 open_scenario_number=scenario_number,
                                                 scenario_conditions=open_confirm_conditions,
                                             )
+                                                symbol_state["last_final_signal"] = "SELL"
                                         else:
                                             opened_transaction.set_status("CLOSE")
                                             db.update_transaction_status(symbol, cnf.PERIOD, opened_transaction.get_time(), "SELL", "CLOSE")
@@ -1010,6 +1062,21 @@ async def main():
                                 period=cnf.PERIOD,
                                 max_time_result_minutes=cnf.MAX_TIME_RESULT,
                             )
+
+                        if close_result.get("close") is not True:
+                            # Fallback close based on candle patterns opposite to the open position.
+                            candle_close_signal = formacje_swiecowe.analyze_close_signal(data, close_type)
+                            if candle_close_signal.get("signal") == "CLOSE":
+                                close_result = {
+                                    "close": True,
+                                    "scenario_number": 92,
+                                    "scenario_conditions": (
+                                        f"C92 CLOSE {close_type} BY CANDLE PATTERN | "
+                                        f"PATTERNS={candle_close_signal.get('patterns', [])}; "
+                                        f"CANDLE_TIME={candle_close_signal.get('candle_time')}"
+                                    ),
+                                }
+                                close_event_type = "CLOSE_CANDLE"
 
                         if close_result.get("close") is not True:
                             continue
@@ -1140,19 +1207,51 @@ async def main():
                
                 except Exception as symbol_error:
                    
-                    logger.error(f"Błąd przetwarzania symbolu {symbol}: {symbol_error}")
-                    print(f"Błąd przetwarzania symbolu {symbol}: {symbol_error}")
+                    logger.error(f"BĹ‚Ä…d przetwarzania symbolu {symbol}: {symbol_error}")
+                    print(f"BĹ‚Ä…d przetwarzania symbolu {symbol}: {symbol_error}")
                     continue
 
+            if symbol_fetch_successes == 0 and len(cnf.SYMBOLS_LIST) > 0:
+                consecutive_full_fetch_failures += 1
+                if not internet_outage_mode:
+                    internet_outage_mode = True
+                    logger.warning(
+                        f"INTERNET_OUTAGE_MODE=ON | data_godzina={datetime.now().strftime('%Y-%m-%d %H:%M:%S')} "
+                        f"| reason=all_symbols_fetch_failed"
+                    )
+
+                reinit_due = (now_ts - last_api_reinit_attempt_ts) >= 30
+                if reinit_due:
+                    last_api_reinit_attempt_ts = now_ts
+                    _try_reinitialize_api_client(reason="all_symbols_fetch_failed")
+
+                outage_sleep_seconds = min(10, sleep_seconds)
+                print(f"Brak internetu lub danych brokera. Retry za {outage_sleep_seconds}s")
+                logger.warning(
+                    f"INTERNET_RETRY_WAIT | data_godzina={datetime.now().strftime('%Y-%m-%d %H:%M:%S')} "
+                    f"| wait_seconds={outage_sleep_seconds} | failures={consecutive_full_fetch_failures}"
+                )
+                wait_loop(outage_sleep_seconds)
+                continue
+
+            if symbol_fetch_successes > 0:
+                if internet_outage_mode:
+                    logger.info(
+                        f"INTERNET_OUTAGE_MODE=OFF | data_godzina={datetime.now().strftime('%Y-%m-%d %H:%M:%S')} "
+                        f"| recovered_symbols={symbol_fetch_successes}"
+                    )
+                internet_outage_mode = False
+                consecutive_full_fetch_failures = 0
+
             if debug_single_run:
-                print("DEBUG_SINGLE_RUN=1 -> kończę po jednej iteracji pętli.")
+                print("DEBUG_SINGLE_RUN=1 -> koĹ„czÄ™ po jednej iteracji pÄ™tli.")
                 break
 
             print(f"p {sleep_seconds}s before next iteration for period {cnf.PERIOD}")
             wait_loop(sleep_seconds)
         except Exception as loop_error:
-            logger.error(f"Błąd głównej pętli while: {loop_error}")
-            print(f"Błąd głównej pętli while: {loop_error}")
+            logger.error(f"BĹ‚Ä…d gĹ‚Ăłwnej pÄ™tli while: {loop_error}")
+            print(f"BĹ‚Ä…d gĹ‚Ăłwnej pÄ™tli while: {loop_error}")
             wait_loop(5)
 
 
@@ -1162,6 +1261,7 @@ def analyze_scenarios(
     mcad_analyze_result_obj,
     ichimoku_result_K: list[str],
     ichimoku_result_S: list[str],
+    candle_pattern_signal: dict[str, Any] | None,
     broker_time_ms: int | None,
     runtime_state: dict,
 ) -> tuple[str, int | None, str | None]:
@@ -1176,9 +1276,28 @@ def analyze_scenarios(
         ichimoku_result_S,
         cnf.PERIOD,
         cnf.MAX_TIME_RESULT,
+        candle_pattern_signal,
     )
     scenario_number = scenario_result.get("scenario_number")
     scenario_conditions = scenario_result.get("scenario_conditions") or "BRAK"
+
+    # For candle-based open scenarios (SC9-SC22), enrich audit payload with explicit candle trigger context.
+    is_candle_open_scenario = isinstance(scenario_number, int) and 9 <= int(scenario_number) <= 22
+    if is_candle_open_scenario:
+        candle_signal_value = None
+        candle_patterns_value: list[str] = []
+        if isinstance(candle_pattern_signal, dict):
+            candle_signal_raw = candle_pattern_signal.get("signal")
+            candle_signal_value = str(candle_signal_raw).upper() if candle_signal_raw is not None else None
+            candle_patterns_raw = candle_pattern_signal.get("patterns")
+            if isinstance(candle_patterns_raw, list):
+                candle_patterns_value = [str(item) for item in candle_patterns_raw]
+
+        candle_audit_context = (
+            f"CANDLE_SCENARIO=True; CANDLE_TRIGGER_SIGNAL={candle_signal_value}; "
+            f"CANDLE_TRIGGER_PATTERNS={candle_patterns_value}"
+        )
+        scenario_conditions = f"{scenario_conditions} | {candle_audit_context}"
 
     scenario_signal = scenario_result.get("signal")
     if scenario_signal not in ("BUY", "SELL"):
@@ -1243,8 +1362,13 @@ def log_scenario_hit_to_file(symbol: str, message: str) -> None:
         logs_dir.mkdir(parents=True, exist_ok=True)
 
         file_path = logs_dir / f"scenariusz_{symbol}.txt"
+        message_to_write = message
+        if "data_godzina=" not in str(message):
+            message_to_write = (
+                f"{message} | data_godzina={datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            )
         with file_path.open("a", encoding="utf-8") as file:
-            file.write(message + "\n")
+            file.write(message_to_write + "\n")
     except Exception as log_error:
         logger.error(f"Nie udalo sie zapisac logu scenariusza dla {symbol}: {log_error}")
 
@@ -1255,8 +1379,13 @@ def log_close_scenario_hit_to_file(symbol: str, message: str) -> None:
         logs_dir.mkdir(parents=True, exist_ok=True)
 
         file_path = logs_dir / f"zakoncz_scenariusz_{symbol}.txt"
+        message_to_write = message
+        if "data_godzina=" not in str(message):
+            message_to_write = (
+                f"{message} | data_godzina={datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            )
         with file_path.open("a", encoding="utf-8") as file:
-            file.write(message + "\n")
+            file.write(message_to_write + "\n")
     except Exception as log_error:
         logger.error(f"Nie udalo sie zapisac logu scenariusza zamkniecia dla {symbol}: {log_error}")
 
@@ -1481,7 +1610,7 @@ def fetch_and_save_last_candle(symbol: str, period: int, max_retries: int = 3, r
             latest_candle = API_CLIENT.get_last_candle(symbol, period)
           
             if not latest_candle:
-                logger.warning(f"Brak danych świecy z get_last_candle dla {symbol}, próba {attempt}/{max_retries}")
+                logger.warning(f"Brak danych Ĺ›wiecy z get_last_candle dla {symbol}, prĂłba {attempt}/{max_retries}")
                 time.sleep(retry_delay)
                 continue
 
@@ -1520,7 +1649,7 @@ def fetch_and_save_last_candle(symbol: str, period: int, max_retries: int = 3, r
             logger.error(f"Error while fetching/saving candle for {symbol} on attempt {attempt}: {e}")
             time.sleep(retry_delay)
 
-    logger.error(f"Nie udało się zapisać świecy dla {symbol} po {max_retries} próbach")
+    logger.error(f"Nie udaĹ‚o siÄ™ zapisaÄ‡ Ĺ›wiecy dla {symbol} po {max_retries} prĂłbach")
     return False
 
 def get_main_loop_sleep_seconds(period_code: str) -> int:

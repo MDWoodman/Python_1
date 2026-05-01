@@ -1,0 +1,1 @@
+ZAMKNIECIE SCENARIUSZ | symbol=STOXX50 | data_godzina=2026-04-30 15:35:53 | typ=BUY | numer_scenariusza=C1 | godzina_brokera=2026-04-30 16:30:00

@@ -143,3 +143,75 @@ def analyze_open_signal(candles: list[Any]) -> dict[str, Any]:
         return CandlePatternResult(signal="SELL", patterns=patterns_sell, candle_time=last.time).to_dict()
 
     return CandlePatternResult(signal=None, patterns=[], candle_time=last.time).to_dict()
+
+
+def analyze_close_signal(candles: list[Any], position_type: str) -> dict[str, Any]:
+    position = str(position_type).upper()
+    if position not in ("BUY", "SELL"):
+        raise ValueError("position_type must be 'BUY' or 'SELL'")
+
+    if len(candles) < 2:
+        return CandlePatternResult(signal=None, patterns=[], candle_time=None).to_dict()
+
+    mapped_candles = [_map_candle(candle) for candle in candles]
+
+    # Collect all bullish and bearish patterns from the latest candles.
+    patterns_buy: list[str] = []
+    patterns_sell: list[str] = []
+
+    last = mapped_candles[-1]
+    prev = mapped_candles[-2]
+
+    if is_hammer(last):
+        patterns_buy.append("Hammer")
+    if is_shooting_star(last):
+        patterns_sell.append("ShootingStar")
+
+    if is_bullish_engulfing(prev, last):
+        patterns_buy.append("BullishEngulfing")
+    if is_bearish_engulfing(prev, last):
+        patterns_sell.append("BearishEngulfing")
+
+    if len(mapped_candles) >= 3:
+        c1, c2, c3 = mapped_candles[-3], mapped_candles[-2], mapped_candles[-1]
+        if is_morning_star(c1, c2, c3):
+            patterns_buy.append("MorningStar")
+        if is_evening_star(c1, c2, c3):
+            patterns_sell.append("EveningStar")
+
+    # Close BUY on bearish formations, close SELL on bullish formations.
+    close_patterns = patterns_sell if position == "BUY" else patterns_buy
+
+    if close_patterns:
+        return CandlePatternResult(signal="CLOSE", patterns=close_patterns, candle_time=last.time).to_dict()
+
+    return CandlePatternResult(signal=None, patterns=[], candle_time=last.time).to_dict()
+
+
+def should_close_position(candles: list[Any], position_type: str) -> bool:
+    close_result = analyze_close_signal(candles, position_type)
+    return close_result.get("signal") == "CLOSE"
+
+
+if __name__ == "__main__":
+    # Example: open BUY position -> check bearish patterns for CLOSE.
+    buy_position_result = analyze_close_signal(
+        candles=[
+            {"time": 1713000000000, "open": 100.0, "high": 106.0, "low": 99.5, "close": 105.5, "volume": 1000},
+            {"time": 1713000300000, "open": 106.0, "high": 106.5, "low": 98.5, "close": 99.0, "volume": 1100},
+            {"time": 1713000600000, "open": 99.5, "high": 100.0, "low": 96.0, "close": 96.5, "volume": 1200},
+        ],
+        position_type="BUY",
+    )
+    print("BUY position close analysis:", buy_position_result)
+
+    # Example: open SELL position -> check bullish patterns for CLOSE.
+    sell_position_result = analyze_close_signal(
+        candles=[
+            {"time": 1713000000000, "open": 105.0, "high": 105.5, "low": 99.0, "close": 100.0, "volume": 1000},
+            {"time": 1713000300000, "open": 99.8, "high": 100.2, "low": 98.0, "close": 99.0, "volume": 1100},
+            {"time": 1713000600000, "open": 98.8, "high": 104.0, "low": 98.5, "close": 103.5, "volume": 1200},
+        ],
+        position_type="SELL",
+    )
+    print("SELL position close analysis:", sell_position_result)

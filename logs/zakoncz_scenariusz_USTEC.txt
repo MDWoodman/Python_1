@@ -1,2 +1,2 @@
-ZAMKNIECIE SCENARIUSZ | symbol=USTEC | data_godzina=2026-04-17 04:10:04 | typ=BUY | numer_scenariusza=C1 | godzina_brokera=2026-04-17 05:05:00
-ZAMKNIECIE SCENARIUSZ | symbol=USTEC | data_godzina=2026-04-17 08:10:12 | typ=SELL | numer_scenariusza=C4 | godzina_brokera=2026-04-17 09:05:00
+ZAMKNIECIE SCENARIUSZ | symbol=USTEC | data_godzina=2026-04-30 00:12:22 | typ=BUY | numer_scenariusza=C90 | godzina_brokera=2026-04-30 01:05:00
+ZAMKNIECIE SCENARIUSZ | symbol=USTEC | data_godzina=2026-04-30 17:02:23 | typ=SELL | numer_scenariusza=C4 | godzina_brokera=2026-04-30 17:55:00

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import math
 from typing import Any
 
 try:
@@ -204,6 +205,38 @@ class API:
             return mt5.ORDER_TYPE_SELL
         raise ValueError("action must be 'buy' or 'sell'")
 
+    @staticmethod
+    def _step_decimals(step: float) -> int:
+        step_text = f"{float(step):.10f}".rstrip("0")
+        if "." not in step_text:
+            return 0
+        return len(step_text.split(".")[1])
+
+    def _normalize_lot_size_for_symbol(self, symbol: str, requested_lot: float) -> float:
+        lot_info = self.get_symbol_lot_info(symbol)
+
+        min_lot = float(lot_info.get("min_lot", 0.01) or 0.01)
+        max_lot = float(lot_info.get("max_lot", min_lot) or min_lot)
+        lot_step = float(lot_info.get("lot_step", 0.01) or 0.01)
+
+        if lot_step <= 0:
+            lot_step = 0.01
+        if max_lot < min_lot:
+            max_lot = min_lot
+
+        requested = float(requested_lot)
+        if requested <= 0:
+            requested = min_lot
+
+        bounded = min(max(requested, min_lot), max_lot)
+
+        steps_from_min = math.floor(((bounded - min_lot) / lot_step) + 1e-12)
+        normalized = min_lot + (steps_from_min * lot_step)
+        normalized = min(max(normalized, min_lot), max_lot)
+
+        decimals = self._step_decimals(lot_step)
+        return round(normalized, decimals)
+
     def open_transaction(
         self,
         action,
@@ -222,6 +255,8 @@ class API:
         if not mt5.symbol_select(symbol, True):
             return None
 
+        normalized_lot = self._normalize_lot_size_for_symbol(symbol, lot_size)
+
         order_type = self._resolve_order_type(action)
         tick = mt5.symbol_info_tick(symbol)
         if tick is None:
@@ -232,7 +267,7 @@ class API:
         request = {
             "action": mt5.TRADE_ACTION_DEAL,
             "symbol": symbol,
-            "volume": float(lot_size),
+            "volume": float(normalized_lot),
             "type": order_type,
             "price": requested_price,
             "sl": float(stop_loss) if stop_loss else 0.0,
