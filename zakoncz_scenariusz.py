@@ -76,14 +76,24 @@ def _mcad_is_sell(mcad_analyze_result_obj: Any) -> bool:
     )
 
 
+def _is_ichi_buy_strong(ichimoku_price_vs_cloud: str | None) -> bool:
+    return str(ichimoku_price_vs_cloud or "").strip().lower() == "above_cloud"
+
+
+def _is_ichi_sell_strong(ichimoku_price_vs_cloud: str | None) -> bool:
+    return str(ichimoku_price_vs_cloud or "").strip().lower() == "below_cloud"
+
+
 def _close_time_limits(period: str | None, max_time_result_minutes: int | None) -> dict[str, int]:
     period_upper = str(period or "").upper()
 
-    # Wider confirmation windows for H1/H4 close decisions.
+    if period_upper == "M5":
+        return {"strict": 20, "medium": 35, "relaxed": 50}
+
     if period_upper == "H1":
-        return {"strict": 240, "medium": 480, "relaxed": 960}
+        return {"strict": 180, "medium": 360, "relaxed": 720}
     if period_upper == "H4":
-        return {"strict": 960, "medium": 1920, "relaxed": 3840}
+        return {"strict": 720, "medium": 1440, "relaxed": 2880}
 
     fallback = int(max_time_result_minutes) if max_time_result_minutes is not None else 510
     return {
@@ -153,6 +163,7 @@ def get_close_signal(
     mcad_analyze_result_obj: Any,
     ichimoku_result_k: list[str],
     ichimoku_result_s: list[str],
+    ichimoku_price_vs_cloud: str | None,
     period: str | None,
     max_time_result_minutes: int | None = None,
 ) -> dict[str, Any]:
@@ -165,6 +176,8 @@ def get_close_signal(
     mcad_sell = _mcad_is_sell(mcad_analyze_result_obj)
     ichi_buy = _has_ichi_buy_signal(ichimoku_result_k)
     ichi_sell = _has_ichi_sell_signal(ichimoku_result_s)
+    ichi_buy_strong = _is_ichi_buy_strong(ichimoku_price_vs_cloud)
+    ichi_sell_strong = _is_ichi_sell_strong(ichimoku_price_vs_cloud)
 
     window = _close_window_minutes(
         adx_analyze_result_obj,
@@ -177,10 +190,26 @@ def get_close_signal(
     base = (
         f"TX={tx_type}; PERIOD={period}; LIMITS={limits}; WINDOW_MIN={window}; "
         f"ADX_BUY={adx_buy}; ADX_SELL={adx_sell}; MCAD_BUY={mcad_buy}; MCAD_SELL={mcad_sell}; "
-        f"ICHI_BUY={ichi_buy}; ICHI_SELL={ichi_sell}"
+        f"ICHI_BUY={ichi_buy}; ICHI_SELL={ichi_sell}; "
+        f"ICHI_PRICE_VS_CLOUD={ichimoku_price_vs_cloud}; "
+        f"ICHI_BUY_STRONG={ichi_buy_strong}; ICHI_SELL_STRONG={ichi_sell_strong}"
     )
 
+    if ichi_buy and ichi_sell:
+        return {
+            "close": False,
+            "scenario_number": None,
+            "scenario_conditions": f"NO_CLOSE | AMBIGUOUS_ICHI=True | {base}",
+        }
+
     if tx_type == "BUY":
+        if ichi_buy_strong:
+            return {
+                "close": False,
+                "scenario_number": None,
+                "scenario_conditions": f"NO_CLOSE | CLOUD_BLOCK_BUY=True | {base}",
+            }
+
         # C1-C3: closing BUY with SELL evidence.
         if adx_sell and mcad_sell and ichi_sell and _within_window(window, limits["strict"]):
             return {"close": True, "scenario_number": 1, "scenario_conditions": f"C1 CLOSE BUY strong | {base}"}
@@ -190,6 +219,13 @@ def get_close_signal(
             return {"close": True, "scenario_number": 3, "scenario_conditions": f"C3 CLOSE BUY momentum | {base}"}
 
     if tx_type == "SELL":
+        if ichi_sell_strong:
+            return {
+                "close": False,
+                "scenario_number": None,
+                "scenario_conditions": f"NO_CLOSE | CLOUD_BLOCK_SELL=True | {base}",
+            }
+
         # C4-C6: closing SELL with BUY evidence.
         if adx_buy and mcad_buy and ichi_buy and _within_window(window, limits["strict"]):
             return {"close": True, "scenario_number": 4, "scenario_conditions": f"C4 CLOSE SELL strong | {base}"}

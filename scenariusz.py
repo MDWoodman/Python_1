@@ -39,6 +39,65 @@ def _has_ichi_sell_signal(ichimoku_result_s: list[str]) -> bool:
     return any(any(keyword in entry for keyword in sell_keywords) for entry in ichimoku_result_s)
 
 
+def _has_tenkansen_kijun_buy_cross(ichimoku_result_k: list[str]) -> bool:
+    if not ichimoku_result_k:
+        return False
+    return any("tenkansen_kiusen_result_enum.Przeciecie_do_gory" in entry for entry in ichimoku_result_k)
+
+
+def _has_price_kijun_buy_cross(ichimoku_result_k: list[str]) -> bool:
+    if not ichimoku_result_k:
+        return False
+    return any("price_kiusen_result_enum.Przeciecie_do_gory" in entry for entry in ichimoku_result_k)
+
+
+def _has_cloud_buy_breakout(ichimoku_result_k: list[str]) -> bool:
+    if not ichimoku_result_k:
+        return False
+    return any("price_senokuspan_result_enum.Przeciecie_do_gory" in entry for entry in ichimoku_result_k)
+
+
+def _has_tenkansen_kijun_sell_cross(ichimoku_result_s: list[str]) -> bool:
+    if not ichimoku_result_s:
+        return False
+    return any("tenkansen_kiusen_result_enum.Przeciecie_do_dolu" in entry for entry in ichimoku_result_s)
+
+
+def _has_price_kijun_sell_cross(ichimoku_result_s: list[str]) -> bool:
+    if not ichimoku_result_s:
+        return False
+    return any("price_kiusen_result_enum.Przeciecie_do_dolu" in entry for entry in ichimoku_result_s)
+
+
+def _has_cloud_sell_breakout(ichimoku_result_s: list[str]) -> bool:
+    if not ichimoku_result_s:
+        return False
+    return any("price_senokuspan_result_enum.Przeciecie_do_dolu" in entry for entry in ichimoku_result_s)
+
+
+def _is_ichi_buy_strong(ichimoku_price_vs_cloud: str | None) -> bool:
+    return str(ichimoku_price_vs_cloud or "").strip().lower() == "above_cloud"
+
+
+def _is_ichi_buy_weak(ichimoku_price_vs_cloud: str | None) -> bool:
+    normalized = str(ichimoku_price_vs_cloud or "").strip().lower()
+    return normalized in {"below_cloud", "inside_cloud"}
+
+
+def _is_ichi_sell_strong(ichimoku_price_vs_cloud: str | None) -> bool:
+    return str(ichimoku_price_vs_cloud or "").strip().lower() == "below_cloud"
+
+
+def _is_ichi_sell_weak(ichimoku_price_vs_cloud: str | None) -> bool:
+    normalized = str(ichimoku_price_vs_cloud or "").strip().lower()
+    return normalized in {"above_cloud", "inside_cloud"}
+
+
+def _is_price_inside_cloud(ichimoku_price_vs_cloud: str | None) -> bool:
+    """Helper function to check if price is inside the Ichimoku cloud."""
+    return str(ichimoku_price_vs_cloud or "").strip().lower() == "inside_cloud"
+
+
 def _extract_ichi_buy_times(ichimoku_result_k: list[str]) -> list[int]:
     times: list[int] = []
     for entry in ichimoku_result_k:
@@ -296,6 +355,7 @@ def get_trade_signal(
     mcad_analyze_result_obj: Any,
     ichimoku_result_k: list[str],
     ichimoku_result_s: list[str],
+    ichimoku_price_vs_cloud: str | None,
     period: str | None,
     max_time_result_minutes: int | None = None,
     candle_pattern_signal: dict[str, Any] | None = None,
@@ -314,6 +374,16 @@ def get_trade_signal(
 
     ichi_buy = _has_ichi_buy_signal(ichimoku_result_k)
     ichi_sell = _has_ichi_sell_signal(ichimoku_result_s)
+    ichi_tk_buy = _has_tenkansen_kijun_buy_cross(ichimoku_result_k)
+    ichi_price_kijun_buy = _has_price_kijun_buy_cross(ichimoku_result_k)
+    ichi_cloud_breakout_buy = _has_cloud_buy_breakout(ichimoku_result_k)
+    ichi_tk_sell = _has_tenkansen_kijun_sell_cross(ichimoku_result_s)
+    ichi_price_kijun_sell = _has_price_kijun_sell_cross(ichimoku_result_s)
+    ichi_cloud_breakout_sell = _has_cloud_sell_breakout(ichimoku_result_s)
+    ichi_buy_strong = _is_ichi_buy_strong(ichimoku_price_vs_cloud)
+    ichi_buy_weak = _is_ichi_buy_weak(ichimoku_price_vs_cloud)
+    ichi_sell_strong = _is_ichi_sell_strong(ichimoku_price_vs_cloud)
+    ichi_sell_weak = _is_ichi_sell_weak(ichimoku_price_vs_cloud)
     candle_buy, candle_sell, candle_patterns, candle_signal = _extract_candle_signal_data(candle_pattern_signal)
 
     # Ambiguous Ichimoku state: skip entries when both sides are signaled at once.
@@ -346,20 +416,25 @@ def get_trade_signal(
         f"PERIOD={period}; LIMITS={limits}; ADX_BUY={adx_buy}; ADX_SELL={adx_sell}; "
         f"ADX_INC={adx_inc}; ADX_DEC={adx_dec}; MCAD_BUY={mcad_buy}; MCAD_SELL={mcad_sell}; "
         f"MCAD_FRESH={mcad_fresh}; ICHI_BUY={ichi_buy}; ICHI_SELL={ichi_sell}; "
+        f"ICHI_PRICE_VS_CLOUD={ichimoku_price_vs_cloud}; "
+        f"ICHI_BUY_STRONG={ichi_buy_strong}; ICHI_BUY_WEAK={ichi_buy_weak}; "
+        f"ICHI_SELL_STRONG={ichi_sell_strong}; ICHI_SELL_WEAK={ichi_sell_weak}; "
+        f"ICHI_TK_BUY={ichi_tk_buy}; ICHI_PRICE_KIJUN_BUY={ichi_price_kijun_buy}; ICHI_CLOUD_BREAKOUT_BUY={ichi_cloud_breakout_buy}; "
+        f"ICHI_TK_SELL={ichi_tk_sell}; ICHI_PRICE_KIJUN_SELL={ichi_price_kijun_sell}; ICHI_CLOUD_BREAKOUT_SELL={ichi_cloud_breakout_sell}; "
         f"BUY_WINDOW_MIN={buy_window}; SELL_WINDOW_MIN={sell_window}; "
         f"CANDLE_SIGNAL={candle_signal}; CANDLE_PATTERNS={candle_patterns}; "
         f"CANDLE_BUY={candle_buy}; CANDLE_SELL={candle_sell}"
     )
 
     # SC9/SC16: Ichimoku trend + ADX strength + MCAD momentum + candle trigger.
-    if ichi_buy and adx_inc and mcad_buy and candle_buy and not ichi_sell and _within_window(buy_window, limits["strict"]):
+    if ichi_buy and adx_inc and mcad_buy and candle_buy and not ichi_sell and not _is_price_inside_cloud(ichimoku_price_vs_cloud) and _within_window(buy_window, limits["strict"]):
         return {
             "signal": "BUY",
             "scenario_number": 9,
             "scenario_conditions": f"SC9 BUY (ICHI trend + ADX strength + MCAD + candle trigger, strict) | {base_conditions}",
         }
 
-    if ichi_sell and adx_inc and mcad_sell and candle_sell and not ichi_buy and _within_window(sell_window, limits["strict"]):
+    if ichi_sell and adx_inc and mcad_sell and candle_sell and not ichi_buy and not _is_price_inside_cloud(ichimoku_price_vs_cloud) and _within_window(sell_window, limits["strict"]):
         return {
             "signal": "SELL",
             "scenario_number": 16,
@@ -367,14 +442,14 @@ def get_trade_signal(
         }
 
     # SC10/SC17: Ichimoku breakout + ADX DI cross + MCAD cross + candle confirmation.
-    if ichi_buy and adx_buy and mcad_buy and candle_buy and _within_window(buy_window, limits["medium"]):
+    if ichi_buy and adx_buy and mcad_buy and candle_buy and not _is_price_inside_cloud(ichimoku_price_vs_cloud) and _within_window(buy_window, limits["medium"]):
         return {
             "signal": "BUY",
             "scenario_number": 10,
             "scenario_conditions": f"SC10 BUY (ICHI breakout + ADX cross + MCAD cross + candle confirmation, medium) | {base_conditions}",
         }
 
-    if ichi_sell and adx_sell and mcad_sell and candle_sell and _within_window(sell_window, limits["medium"]):
+    if ichi_sell and adx_sell and mcad_sell and candle_sell and not _is_price_inside_cloud(ichimoku_price_vs_cloud) and _within_window(sell_window, limits["medium"]):
         return {
             "signal": "SELL",
             "scenario_number": 17,
@@ -382,14 +457,14 @@ def get_trade_signal(
         }
 
     # SC11/SC18: Ichimoku trend filter + ADX strength + no opposite MCAD + candle trigger.
-    if ichi_buy and adx_buy and adx_inc and not mcad_sell and candle_buy and _within_window(buy_window, limits["medium"]):
+    if ichi_buy and adx_buy and adx_inc and not mcad_sell and candle_buy and not _is_price_inside_cloud(ichimoku_price_vs_cloud) and _within_window(buy_window, limits["medium"]):
         return {
             "signal": "BUY",
             "scenario_number": 11,
             "scenario_conditions": f"SC11 BUY (ICHI trend filter + ADX strength + MACD filter + candle trigger, medium) | {base_conditions}",
         }
 
-    if ichi_sell and adx_sell and adx_inc and not mcad_buy and candle_sell and _within_window(sell_window, limits["medium"]):
+    if ichi_sell and adx_sell and adx_inc and not mcad_buy and candle_sell and not _is_price_inside_cloud(ichimoku_price_vs_cloud) and _within_window(sell_window, limits["medium"]):
         return {
             "signal": "SELL",
             "scenario_number": 18,
@@ -427,14 +502,14 @@ def get_trade_signal(
         }
 
     # SC14/SC21: Ichimoku as trend filter, ADX as strength filter, MACD momentum + candle confirmation.
-    if ichi_buy and adx_inc and mcad_buy and candle_buy and not adx_sell and _within_window(buy_window, limits["medium"]):
+    if ichi_buy and adx_inc and mcad_buy and candle_buy and not adx_sell and not _is_price_inside_cloud(ichimoku_price_vs_cloud) and _within_window(buy_window, limits["medium"]):
         return {
             "signal": "BUY",
             "scenario_number": 14,
             "scenario_conditions": f"SC14 BUY (ICHI filter + ADX strength + MCAD momentum + candle confirmation, medium) | {base_conditions}",
         }
 
-    if ichi_sell and adx_inc and mcad_sell and candle_sell and not adx_buy and _within_window(sell_window, limits["medium"]):
+    if ichi_sell and adx_inc and mcad_sell and candle_sell and not adx_buy and not _is_price_inside_cloud(ichimoku_price_vs_cloud) and _within_window(sell_window, limits["medium"]):
         return {
             "signal": "SELL",
             "scenario_number": 21,
@@ -442,14 +517,14 @@ def get_trade_signal(
         }
 
     # SC15/SC22: Candle confirmation + ADX DI cross + MCAD DI direction, Ichimoku as opposite-side blocker.
-    if candle_buy and adx_buy and mcad_buy and not ichi_sell and _within_window(buy_window, limits["strict"]):
+    if candle_buy and adx_buy and mcad_buy and not ichi_sell and not _is_price_inside_cloud(ichimoku_price_vs_cloud) and _within_window(buy_window, limits["strict"]):
         return {
             "signal": "BUY",
             "scenario_number": 15,
             "scenario_conditions": f"SC15 BUY (candle confirmation + ADX cross + MCAD direction, strict) | {base_conditions}",
         }
 
-    if candle_sell and adx_sell and mcad_sell and not ichi_buy and _within_window(sell_window, limits["strict"]):
+    if candle_sell and adx_sell and mcad_sell and not ichi_buy and not _is_price_inside_cloud(ichimoku_price_vs_cloud) and _within_window(sell_window, limits["strict"]):
         return {
             "signal": "SELL",
             "scenario_number": 22,
@@ -457,7 +532,7 @@ def get_trade_signal(
         }
 
     # SC1 (BUY): ADX(DI cross) + MCAD with ADX momentum and fresh MCAD cross.
-    if adx_buy and adx_inc and mcad_buy and mcad_fresh and not ichi_sell and _within_window(buy_window, limits["strict"]):
+    if adx_buy and adx_inc and mcad_buy and mcad_fresh and not ichi_sell and not _is_price_inside_cloud(ichimoku_price_vs_cloud) and _within_window(buy_window, limits["strict"]):
         return {
             "signal": "BUY",
             "scenario_number": 1,
@@ -465,7 +540,7 @@ def get_trade_signal(
         }
 
     # SC2 (BUY): Ichimoku + ADX.
-    if adx_buy and ichi_buy and not mcad_sell and _within_window(buy_window, limits["medium"]):
+    if adx_buy and ichi_buy and not mcad_sell and not _is_price_inside_cloud(ichimoku_price_vs_cloud) and _within_window(buy_window, limits["medium"]):
         return {
             "signal": "BUY",
             "scenario_number": 2,
@@ -480,44 +555,180 @@ def get_trade_signal(
             "scenario_conditions": f"SC3 BUY (ICHI+MCAD, relaxed) | {base_conditions}",
         }
 
-    # SC4 (BUY): tylko Ichimoku, bez przeciwnych sygnalow ADX/MCAD.
-    if ichi_buy and not adx_sell and not mcad_sell and _within_window(buy_window, limits["relaxed"]):
+    # SC4 (BUY): Tenkan/Kijun cross nad chmura (silny sygnal), bez przeciwnych sygnalow ADX/MCAD.
+    if ichi_tk_buy and ichi_buy_strong and not adx_sell and not mcad_sell and _within_window(buy_window, limits["relaxed"]):
         return {
             "signal": "BUY",
             "scenario_number": 4,
-            "scenario_conditions": f"SC4 BUY (ICHI only, relaxed) | {base_conditions}",
+            "scenario_conditions": f"SC4 BUY (ICHI TK/Kijun cross, strong above cloud, relaxed) | {base_conditions}",
+        }
+
+    # SC23 (BUY): Tenkan/Kijun cross pod/w chmurze (slaby sygnal), bez przeciwnych sygnalow ADX/MCAD.
+    if ichi_tk_buy and ichi_buy_weak and not adx_sell and not mcad_sell and _within_window(buy_window, limits["relaxed"]):
+        return {
+            "signal": "BUY",
+            "scenario_number": 23,
+            "scenario_conditions": f"SC23 BUY (ICHI TK/Kijun cross, weak below/inside cloud, relaxed) | {base_conditions}",
+        }
+
+    # SC24 (BUY): Price/Kijun cross nad chmura (silny sygnal), bez przeciwnych sygnalow ADX/MCAD.
+    if ichi_price_kijun_buy and ichi_buy_strong and not adx_sell and not mcad_sell and _within_window(buy_window, limits["relaxed"]):
+        return {
+            "signal": "BUY",
+            "scenario_number": 24,
+            "scenario_conditions": f"SC24 BUY (ICHI Price/Kijun cross, strong above cloud, relaxed) | {base_conditions}",
+        }
+
+    # SC25 (BUY): Price/Kijun cross pod/w chmurze (slaby sygnal), bez przeciwnych sygnalow ADX/MCAD.
+    if ichi_price_kijun_buy and ichi_buy_weak and not adx_sell and not mcad_sell and _within_window(buy_window, limits["relaxed"]):
+        return {
+            "signal": "BUY",
+            "scenario_number": 25,
+            "scenario_conditions": f"SC25 BUY (ICHI Price/Kijun cross, weak below/inside cloud, relaxed) | {base_conditions}",
+        }
+
+    # SC26 (BUY): wybicie ceny z chmury w gore, bez przeciwnych sygnalow ADX/MCAD.
+    if ichi_cloud_breakout_buy and not adx_sell and not mcad_sell and _within_window(buy_window, limits["relaxed"]):
+        return {
+            "signal": "BUY",
+            "scenario_number": 26,
+            "scenario_conditions": f"SC26 BUY (ICHI cloud breakout up, relaxed) | {base_conditions}",
+        }
+
+    # SC27 (BUY): fallback Ichimoku-only, gdy sygnal BUY istnieje, ale nie pasuje do podtypow.
+    if ichi_buy and not adx_sell and not mcad_sell and _within_window(buy_window, limits["relaxed"]):
+        return {
+            "signal": "BUY",
+            "scenario_number": 27,
+            "scenario_conditions": f"SC27 BUY (ICHI only fallback, relaxed) | {base_conditions}",
         }
 
     # SC5 (SELL): ADX(DI cross) + MCAD with ADX momentum and fresh MCAD cross.
-    if adx_sell and adx_inc and mcad_sell and mcad_fresh and not ichi_buy and _within_window(sell_window, limits["strict"]):
+    if adx_sell and adx_inc and mcad_sell and mcad_fresh and not ichi_buy and ichi_sell_strong and not _is_price_inside_cloud(ichimoku_price_vs_cloud) and _within_window(sell_window, limits["strict"]):
         return {
             "signal": "SELL",
             "scenario_number": 5,
-            "scenario_conditions": f"SC5 SELL (ADX+MCAD, strict) | {base_conditions}",
+            "scenario_conditions": f"SC5 SELL (ADX+MCAD, strict, strong below cloud) | {base_conditions}",
+        }
+
+    if adx_sell and adx_inc and mcad_sell and mcad_fresh and not ichi_buy and ichi_sell_weak and not _is_price_inside_cloud(ichimoku_price_vs_cloud) and _within_window(sell_window, limits["strict"]):
+        return {
+            "signal": "SELL",
+            "scenario_number": 5,
+            "scenario_conditions": f"SC5 SELL (ADX+MCAD, strict, weak above/inside cloud) | {base_conditions}",
+        }
+
+    if adx_sell and adx_inc and mcad_sell and mcad_fresh and not ichi_buy and not _is_price_inside_cloud(ichimoku_price_vs_cloud) and _within_window(sell_window, limits["strict"]):
+        return {
+            "signal": "SELL",
+            "scenario_number": 5,
+            "scenario_conditions": f"SC5 SELL (ADX+MCAD, strict, cloud unknown) | {base_conditions}",
         }
 
     # SC6 (SELL): Ichimoku + ADX.
-    if adx_sell and ichi_sell and not mcad_buy and _within_window(sell_window, limits["medium"]):
+    if adx_sell and ichi_sell and ichi_sell_strong and not mcad_buy and not _is_price_inside_cloud(ichimoku_price_vs_cloud) and _within_window(sell_window, limits["medium"]):
         return {
             "signal": "SELL",
             "scenario_number": 6,
-            "scenario_conditions": f"SC6 SELL (ICHI+ADX, medium) | {base_conditions}",
+            "scenario_conditions": f"SC6 SELL (ICHI+ADX, medium, strong below cloud) | {base_conditions}",
+        }
+
+    if adx_sell and ichi_sell and ichi_sell_weak and not mcad_buy and not _is_price_inside_cloud(ichimoku_price_vs_cloud) and _within_window(sell_window, limits["medium"]):
+        return {
+            "signal": "SELL",
+            "scenario_number": 6,
+            "scenario_conditions": f"SC6 SELL (ICHI+ADX, medium, weak above/inside cloud) | {base_conditions}",
+        }
+
+    if adx_sell and ichi_sell and not mcad_buy and not _is_price_inside_cloud(ichimoku_price_vs_cloud) and _within_window(sell_window, limits["medium"]):
+        return {
+            "signal": "SELL",
+            "scenario_number": 6,
+            "scenario_conditions": f"SC6 SELL (ICHI+ADX, medium, cloud unknown) | {base_conditions}",
         }
 
     # SC7 (SELL): Ichimoku + MCAD.
+    if mcad_sell and ichi_sell and ichi_sell_strong and not adx_buy and _within_window(sell_window, limits["relaxed"]):
+        return {
+            "signal": "SELL",
+            "scenario_number": 7,
+            "scenario_conditions": f"SC7 SELL (ICHI+MCAD, relaxed, strong below cloud) | {base_conditions}",
+        }
+
+    if mcad_sell and ichi_sell and ichi_sell_weak and not adx_buy and _within_window(sell_window, limits["relaxed"]):
+        return {
+            "signal": "SELL",
+            "scenario_number": 7,
+            "scenario_conditions": f"SC7 SELL (ICHI+MCAD, relaxed, weak above/inside cloud) | {base_conditions}",
+        }
+
     if mcad_sell and ichi_sell and not adx_buy and _within_window(sell_window, limits["relaxed"]):
         return {
             "signal": "SELL",
             "scenario_number": 7,
-            "scenario_conditions": f"SC7 SELL (ICHI+MCAD, relaxed) | {base_conditions}",
+            "scenario_conditions": f"SC7 SELL (ICHI+MCAD, relaxed, cloud unknown) | {base_conditions}",
+        }
+
+    # SC28 (SELL): Tenkan/Kijun cross pod chmura (silny sygnal), bez przeciwnych sygnalow ADX/MCAD.
+    if ichi_tk_sell and ichi_sell_strong and not adx_buy and not mcad_buy and _within_window(sell_window, limits["relaxed"]):
+        return {
+            "signal": "SELL",
+            "scenario_number": 28,
+            "scenario_conditions": f"SC28 SELL (ICHI TK/Kijun cross, strong below cloud, relaxed) | {base_conditions}",
+        }
+
+    # SC29 (SELL): Tenkan/Kijun cross nad/w chmurze (slaby sygnal), bez przeciwnych sygnalow ADX/MCAD.
+    if ichi_tk_sell and ichi_sell_weak and not adx_buy and not mcad_buy and _within_window(sell_window, limits["relaxed"]):
+        return {
+            "signal": "SELL",
+            "scenario_number": 29,
+            "scenario_conditions": f"SC29 SELL (ICHI TK/Kijun cross, weak above/inside cloud, relaxed) | {base_conditions}",
+        }
+
+    # SC30 (SELL): Price/Kijun cross pod chmura (silny sygnal), bez przeciwnych sygnalow ADX/MCAD.
+    if ichi_price_kijun_sell and ichi_sell_strong and not adx_buy and not mcad_buy and _within_window(sell_window, limits["relaxed"]):
+        return {
+            "signal": "SELL",
+            "scenario_number": 30,
+            "scenario_conditions": f"SC30 SELL (ICHI Price/Kijun cross, strong below cloud, relaxed) | {base_conditions}",
+        }
+
+    # SC31 (SELL): Price/Kijun cross nad/w chmurze (slaby sygnal), bez przeciwnych sygnalow ADX/MCAD.
+    if ichi_price_kijun_sell and ichi_sell_weak and not adx_buy and not mcad_buy and _within_window(sell_window, limits["relaxed"]):
+        return {
+            "signal": "SELL",
+            "scenario_number": 31,
+            "scenario_conditions": f"SC31 SELL (ICHI Price/Kijun cross, weak above/inside cloud, relaxed) | {base_conditions}",
+        }
+
+    # SC32 (SELL): wybicie ceny z chmury w dol, bez przeciwnych sygnalow ADX/MCAD.
+    if ichi_cloud_breakout_sell and not adx_buy and not mcad_buy and _within_window(sell_window, limits["relaxed"]):
+        return {
+            "signal": "SELL",
+            "scenario_number": 32,
+            "scenario_conditions": f"SC32 SELL (ICHI cloud breakout down, relaxed) | {base_conditions}",
         }
 
     # SC8 (SELL): tylko Ichimoku, bez przeciwnych sygnalow ADX/MCAD.
+    if ichi_sell and ichi_sell_strong and not adx_buy and not mcad_buy and _within_window(sell_window, limits["relaxed"]):
+        return {
+            "signal": "SELL",
+            "scenario_number": 8,
+            "scenario_conditions": f"SC8 SELL (ICHI only, relaxed, strong below cloud) | {base_conditions}",
+        }
+
+    if ichi_sell and ichi_sell_weak and not adx_buy and not mcad_buy and _within_window(sell_window, limits["relaxed"]):
+        return {
+            "signal": "SELL",
+            "scenario_number": 8,
+            "scenario_conditions": f"SC8 SELL (ICHI only, relaxed, weak above/inside cloud) | {base_conditions}",
+        }
+
     if ichi_sell and not adx_buy and not mcad_buy and _within_window(sell_window, limits["relaxed"]):
         return {
             "signal": "SELL",
             "scenario_number": 8,
-            "scenario_conditions": f"SC8 SELL (ICHI only, relaxed) | {base_conditions}",
+            "scenario_conditions": f"SC8 SELL (ICHI only, relaxed, cloud unknown) | {base_conditions}",
         }
 
     return {
@@ -532,6 +743,7 @@ def get_buy_signal(
     mcad_analyze_result_obj: Any,
     ichimoku_result_k: list[str],
     ichimoku_result_s: list[str],
+    ichimoku_price_vs_cloud: str | None = None,
     max_time_result_minutes: int | None = None,
 ) -> dict[str, Any]:
     # Backward-compatible wrapper for old call sites expecting BUY-only semantics.
@@ -540,6 +752,7 @@ def get_buy_signal(
         mcad_analyze_result_obj,
         ichimoku_result_k,
         ichimoku_result_s,
+        ichimoku_price_vs_cloud,
         period=None,
         max_time_result_minutes=max_time_result_minutes,
         candle_pattern_signal=None,

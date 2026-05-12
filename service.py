@@ -577,7 +577,7 @@ async def main():
                          #   print(f"MCAD Data godzina : {datetime.now() } , Symbol {symbol}")
 
                     #ICHIMOKU
-                    ichimoku_result_K , ichimoku_result_S = analzye_ichimoku_candles(ordered_data , product)
+                    ichimoku_result_K , ichimoku_result_S, ichimoku_price_vs_cloud = analzye_ichimoku_candles(ordered_data , product)
                     save_ichimoku_result_to_database_if_needed(product, ichimoku_result_K, ichimoku_result_S)
 
                     if ichimoku_result_K or ichimoku_result_S:
@@ -603,6 +603,7 @@ async def main():
                         mcad_analyze_result_obj,
                         ichimoku_result_K,
                         ichimoku_result_S,
+                        ichimoku_price_vs_cloud,
                         pattern_signal,
                         _extract_latest_broker_time_ms(data),
                         symbol_state,
@@ -630,7 +631,6 @@ async def main():
                         scenario_number = None
                         scenario_conditions = "BRAK"
 
-                    prev_signal = symbol_state.get("last_final_signal")
                     symbol_busy = _symbol_has_open_or_pending_transaction(symbol, opened_transactions_list)
                     if cnf.AUTO_OPEN_TRANSACTION and final_signal in ("BUY", "SELL") and symbol_busy:
                         log_trade_audit_event(
@@ -647,7 +647,6 @@ async def main():
                     if (
                         cnf.AUTO_OPEN_TRANSACTION
                         and final_signal == "BUY"
-                        and prev_signal == "SELL"
                         and not symbol_busy
                     ):
                         status_communication.send_api_request_to_open_transaction("BUY", symbol)
@@ -772,7 +771,7 @@ async def main():
                                                 open_scenario_number=scenario_number,
                                                 scenario_conditions=open_confirm_conditions,
                                             )
-                                                symbol_state["last_final_signal"] = "BUY"
+                                            symbol_state["last_final_signal"] = "BUY"
                                         else:
                                             opened_transaction.set_status("CLOSE")
                                             db.update_transaction_status(symbol, cnf.PERIOD, opened_transaction.get_time(), "BUY", "CLOSE")
@@ -827,7 +826,6 @@ async def main():
                     if (
                         cnf.AUTO_OPEN_TRANSACTION
                         and final_signal == "SELL"
-                        and prev_signal == "BUY"
                         and not symbol_busy
                     ):
                         status_communication.send_api_request_to_open_transaction("SELL", symbol)
@@ -951,7 +949,7 @@ async def main():
                                                 open_scenario_number=scenario_number,
                                                 scenario_conditions=open_confirm_conditions,
                                             )
-                                                symbol_state["last_final_signal"] = "SELL"
+                                            symbol_state["last_final_signal"] = "SELL"
                                         else:
                                             opened_transaction.set_status("CLOSE")
                                             db.update_transaction_status(symbol, cnf.PERIOD, opened_transaction.get_time(), "SELL", "CLOSE")
@@ -1059,8 +1057,26 @@ async def main():
                                 mcad_analyze_result_obj=mcad_analyze_result_obj,
                                 ichimoku_result_k=ichimoku_result_K,
                                 ichimoku_result_s=ichimoku_result_S,
+                                ichimoku_price_vs_cloud=ichimoku_price_vs_cloud,
                                 period=cnf.PERIOD,
                                 max_time_result_minutes=cnf.MAX_TIME_RESULT,
+                            )
+
+                        close_conditions = str(close_result.get("scenario_conditions") or "")
+                        is_close_filter_block = (
+                            "AMBIGUOUS_ICHI=True" in close_conditions
+                            or "CLOUD_BLOCK_BUY=True" in close_conditions
+                            or "CLOUD_BLOCK_SELL=True" in close_conditions
+                        )
+
+                        if close_result.get("close") is not True and is_close_filter_block:
+                            log_trade_audit_event(
+                                symbol=opened_transaction.get_symbol(),
+                                event_type="CLOSE_FILTER_BLOCKED",
+                                signal=close_type,
+                                broker_time_ms=_extract_latest_broker_time_ms(data),
+                                close_scenario_number=None,
+                                scenario_conditions=close_conditions,
                             )
 
                         if close_result.get("close") is not True:
@@ -1261,6 +1277,7 @@ def analyze_scenarios(
     mcad_analyze_result_obj,
     ichimoku_result_K: list[str],
     ichimoku_result_S: list[str],
+    ichimoku_price_vs_cloud: str | None,
     candle_pattern_signal: dict[str, Any] | None,
     broker_time_ms: int | None,
     runtime_state: dict,
@@ -1274,6 +1291,7 @@ def analyze_scenarios(
         mcad_analyze_result_obj,
         ichimoku_result_K,
         ichimoku_result_S,
+        ichimoku_price_vs_cloud,
         cnf.PERIOD,
         cnf.MAX_TIME_RESULT,
         candle_pattern_signal,
@@ -1389,14 +1407,14 @@ def log_close_scenario_hit_to_file(symbol: str, message: str) -> None:
     except Exception as log_error:
         logger.error(f"Nie udalo sie zapisac logu scenariusza zamkniecia dla {symbol}: {log_error}")
 
-def analzye_ichimoku_candles(candles:list[Candle] , product : ProductConf) -> tuple[list[str], list[str]]:
+def analzye_ichimoku_candles(candles:list[Candle] , product : ProductConf) -> tuple[list[str], list[str], str | None]:
     if candles is None or len(candles) == 0:
-        return [], []
+        return [], [], None
 
     ichi_obj = ichi.ichimoku_object()
     ichi_data = ichi_obj.get_data_from_candle_array(candles)
     if ichi_data.empty:
-        return [], []
+        return [], [], None
 
     last_n = min(30, len(ichi_data))
     last_n_candles_df = ichi_data.tail(last_n).copy()
@@ -1411,7 +1429,7 @@ def analzye_ichimoku_candles(candles:list[Candle] , product : ProductConf) -> tu
         period=cnf.PERIOD,
     )
     if ichi_analyze_result_obj is None:
-        return [], []
+        return [], [], None
 
     ichi_result_data = ichi_analyze_result_obj.get_result()
     result_K = []
@@ -1439,9 +1457,11 @@ def analzye_ichimoku_candles(candles:list[Candle] , product : ProductConf) -> tu
     if senkou_result == ichi.ichi_crossover_price_senokuspan_result_enum.Przeciecie_do_dolu:
         append_result(result_S, "ichi_crossover_price_senokuspan_result_enum.Przeciecie_do_dolu", ichi_result_data.time_of_cross_price_senokuspan)
 
-   
+    cloud_position = None
+    if ichi_result_data.price_vs_cloud is not None:
+        cloud_position = str(getattr(ichi_result_data.price_vs_cloud, "name", None))
 
-    return result_K , result_S
+    return result_K , result_S, cloud_position
 
 
 def save_ichimoku_result_to_database_if_needed(

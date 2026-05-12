@@ -32,6 +32,13 @@ class ichi_crossover_tenkansen_kiusen_result_enum(Enum):
     Brak_przeciecia = 3
 
 
+class ichi_price_vs_cloud_result_enum(Enum):
+    Above_cloud = 1
+    Below_cloud = 2
+    Inside_cloud = 3
+    Unknown = 4
+
+
 class ichi_result_object:
     def __init__(self):
         self._crossover_result_tenkansen_kiusen: ichi_crossover_tenkansen_kiusen_result_enum | None = None
@@ -42,6 +49,7 @@ class ichi_result_object:
 
         self._crossover_price_senokuspan: ichi_crossover_price_senokuspan_result_enum | None = None
         self._time_of_cross_price_senokuspan: int | None = None
+        self._price_vs_cloud: ichi_price_vs_cloud_result_enum | None = None
 
     @property
     def crossover_result_tenkansen_kiusen(self):
@@ -90,6 +98,14 @@ class ichi_result_object:
     @time_of_cross_price_senokuspan.setter
     def time_of_cross_price_senokuspan(self, value):
         self._time_of_cross_price_senokuspan = value
+
+    @property
+    def price_vs_cloud(self):
+        return self._price_vs_cloud
+
+    @price_vs_cloud.setter
+    def price_vs_cloud(self, value):
+        self._price_vs_cloud = value
 
 
 class ichimoku_analyze_result_object:
@@ -288,6 +304,35 @@ class ichimoku_object:
 
         return ichi_crossover_price_senokuspan_result_enum.Brak_przeciecia, _to_epoch_ms(merged.iloc[-1]["Date"])
 
+    def _latest_price_vs_cloud_position(
+        self,
+        candle_df: pd.DataFrame,
+        line_df: pd.DataFrame,
+    ) -> ichi_price_vs_cloud_result_enum:
+        if candle_df.empty:
+            return ichi_price_vs_cloud_result_enum.Unknown
+
+        merged = candle_df.merge(line_df[["Date", "Senkou_Span_A", "Senkou_Span_B"]], on="Date", how="left")
+
+        for idx in range(len(merged) - 1, -1, -1):
+            row = merged.iloc[idx]
+            span_a = row["Senkou_Span_A"]
+            span_b = row["Senkou_Span_B"]
+            if pd.isna(span_a) or pd.isna(span_b):
+                continue
+
+            close_price = float(row["Close"])
+            cloud_top = max(float(span_a), float(span_b))
+            cloud_bottom = min(float(span_a), float(span_b))
+
+            if close_price > cloud_top:
+                return ichi_price_vs_cloud_result_enum.Above_cloud
+            if close_price < cloud_bottom:
+                return ichi_price_vs_cloud_result_enum.Below_cloud
+            return ichi_price_vs_cloud_result_enum.Inside_cloud
+
+        return ichi_price_vs_cloud_result_enum.Unknown
+
     def analyze_ichimoku(
         self,
         stock_data_in: pd.DataFrame | Sequence[Any],
@@ -325,6 +370,7 @@ class ichimoku_object:
         cloud_result, cloud_time = self._latest_price_vs_cloud_cross(last_df, ichi_df)
         result.crossover_price_senokuspan = cloud_result
         result.time_of_cross_price_senokuspan = cloud_time
+        result.price_vs_cloud = self._latest_price_vs_cloud_position(last_df, ichi_df)
 
         return result
 

@@ -1,10 +1,30 @@
-[
-    
+[ 
     {
         "symbol": "USDJPY",
         "name": "US Dollar / Japanese Yen",
-        "risk_price" : 10,
-        "SL": 20
-
+        "risk_price": 10,
+        "SL": 20,
+        "volume": 0.01
+    },
+    {
+        "symbol": "US500",
+        "name": "S&P 500",
+        "risk_price": 10,
+        "SL": 20,
+        "volume": 0.01
+    },
+    {
+        "symbol": "DE40",
+        "name": "Germany 40",
+        "risk_price": 10,
+        "SL": 20,
+        "volume": 0.01
+    },
+    {
+        "symbol": "JP225",
+        "name": "Japan 225",
+        "risk_price": 10,
+        "SL": 20,
+        "volume": 0.01
     }
 ]

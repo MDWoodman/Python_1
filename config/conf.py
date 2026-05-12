@@ -11,7 +11,7 @@ MODE = 'demo'
 MT5_SERVER = 'ICMarketsEU-Demo'
 MT5_PATH = r'C:\Program Files\MetaTrader 5 IC Markets EU\terminal64.exe'
 
-SYMBOLS_LIST = ['STOXX50' , 'UK100', 'USTEC', 'US30']
+SYMBOLS_LIST = ['STOXX50' , 'UK100', 'USTEC', 'US30', 'US500', 'DE40', 'JP225']
 PERIOD = "M5"
 NUM_CANDLES = 100
 MAX_TIME_RESULT = 510
