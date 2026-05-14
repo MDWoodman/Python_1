@@ -1,0 +1,11 @@
+ZAMKNIECIE SCENARIUSZ | symbol=DE40 | data_godzina=2026-05-13 03:06:33 | typ=SELL | numer_scenariusza=C6 | godzina_brokera=2026-05-13 04:00:00
+ZAMKNIECIE SCENARIUSZ | symbol=DE40 | data_godzina=2026-05-13 11:22:21 | typ=BUY | numer_scenariusza=C2 | godzina_brokera=2026-05-13 12:15:00
+ZAMKNIECIE SCENARIUSZ | symbol=DE40 | data_godzina=2026-05-13 13:37:10 | typ=SELL | numer_scenariusza=C6 | godzina_brokera=2026-05-13 14:30:00
+ZAMKNIECIE SCENARIUSZ | symbol=DE40 | data_godzina=2026-05-14 02:16:31 | typ=SELL | numer_scenariusza=C92 | godzina_brokera=2026-05-14 03:10:00
+ZAMKNIECIE SCENARIUSZ | symbol=DE40 | data_godzina=2026-05-14 03:40:17 | typ=BUY | numer_scenariusza=C1 | godzina_brokera=2026-05-14 04:35:00
+ZAMKNIECIE SCENARIUSZ | symbol=DE40 | data_godzina=2026-05-14 03:50:27 | typ=SELL | numer_scenariusza=C90 | godzina_brokera=2026-05-14 04:45:00
+ZAMKNIECIE SCENARIUSZ | symbol=DE40 | data_godzina=2026-05-14 04:46:18 | typ=SELL | numer_scenariusza=C90 | godzina_brokera=2026-05-14 05:40:00
+ZAMKNIECIE SCENARIUSZ | symbol=DE40 | data_godzina=2026-05-14 07:46:29 | typ=BUY | numer_scenariusza=C3 | godzina_brokera=2026-05-14 08:40:00
+ZAMKNIECIE SCENARIUSZ | symbol=DE40 | data_godzina=2026-05-14 08:14:28 | typ=BUY | numer_scenariusza=C90 | godzina_brokera=2026-05-14 09:05:00
+ZAMKNIECIE SCENARIUSZ | symbol=DE40 | data_godzina=2026-05-14 09:05:19 | typ=BUY | numer_scenariusza=C90 | godzina_brokera=2026-05-14 10:00:00
+ZAMKNIECIE SCENARIUSZ | symbol=DE40 | data_godzina=2026-05-14 17:02:34 | typ=BUY | numer_scenariusza=C90 | godzina_brokera=2026-05-14 17:55:00

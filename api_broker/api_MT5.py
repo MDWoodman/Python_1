@@ -321,3 +321,54 @@ class API:
         if result is None:
             return None
         return result._asdict()
+
+    def update_position_sl_tp(
+        self,
+        ticket: int,
+        stop_loss: float | None = None,
+        take_profit: float | None = None,
+        symbol: str | None = None,
+    ):
+        """Update SL/TP for an existing position without reopening it."""
+        self._ensure_connected()
+
+        positions = mt5.positions_get(ticket=int(ticket))
+        if positions is None or len(positions) == 0:
+            return None
+
+        pos = positions[0]
+        symbol_name = str(symbol) if symbol else str(pos.symbol)
+
+        sl_value = float(stop_loss) if stop_loss is not None else float(getattr(pos, "sl", 0.0) or 0.0)
+        tp_value = float(take_profit) if take_profit is not None else float(getattr(pos, "tp", 0.0) or 0.0)
+
+        request = {
+            "action": mt5.TRADE_ACTION_SLTP,
+            "position": int(ticket),
+            "symbol": symbol_name,
+            "sl": sl_value,
+            "tp": tp_value,
+            "magic": int(getattr(pos, "magic", 0) or 0),
+        }
+
+        result = mt5.order_send(request)
+        if result is None:
+            return None
+        return result._asdict()
+
+    def has_open_position(self, symbol: str, magic: int | None = None) -> bool:
+        """Return True when MT5 has an open position for symbol.
+
+        If magic is provided, checks only positions with that magic number.
+        """
+        self._ensure_connected()
+
+        positions = mt5.positions_get(symbol=str(symbol))
+        if positions is None or len(positions) == 0:
+            return False
+
+        if magic is None:
+            return True
+
+        expected_magic = int(magic)
+        return any(int(getattr(pos, "magic", 0) or 0) == expected_magic for pos in positions)

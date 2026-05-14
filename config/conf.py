@@ -28,6 +28,14 @@ SL_SIGNAL_BUFFER = 0.0
 ENABLE_TP = False
 TP_RR_RATIO = 2.0
 
+# Runtime SL protection for open positions (tighten-only).
+ENABLE_SL_MANAGEMENT = True
+SL_BREAK_EVEN_ENABLED = True
+SL_BREAK_EVEN_TRIGGER = 0.0
+SL_BREAK_EVEN_OFFSET = 0.0
+SL_TRAILING_ENABLED = False
+SL_TRAILING_DISTANCE = 25.0
+
 # generate connection string for sqlite3 database
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 _DEFAULT_DB_PATH = _PROJECT_ROOT / "database" / "data" / "candels2.db"

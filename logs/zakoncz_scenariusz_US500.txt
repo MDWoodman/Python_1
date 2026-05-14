@@ -1,0 +1,2 @@
+ZAMKNIECIE SCENARIUSZ | symbol=US500 | data_godzina=2026-05-13 12:31:02 | typ=BUY | numer_scenariusza=C1 | godzina_brokera=2026-05-13 13:25:00
+ZAMKNIECIE SCENARIUSZ | symbol=US500 | data_godzina=2026-05-13 16:40:48 | typ=SELL | numer_scenariusza=C92 | godzina_brokera=2026-05-13 17:35:00
