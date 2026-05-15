@@ -1,0 +1,6 @@
+ZAMKNIECIE SCENARIUSZ | symbol=STOXX50 | data_godzina=2026-05-15 10:42:19 | typ=SELL | numer_scenariusza=C92 | godzina_brokera=2026-05-15 11:35:00
+ZAMKNIECIE SCENARIUSZ | symbol=STOXX50 | data_godzina=2026-05-15 10:50:18 | typ=SELL | numer_scenariusza=C90 | godzina_brokera=2026-05-15 11:45:00
+ZAMKNIECIE SCENARIUSZ | symbol=STOXX50 | data_godzina=2026-05-15 14:01:12 | typ=SELL | numer_scenariusza=C92 | godzina_brokera=2026-05-15 14:55:00
+ZAMKNIECIE SCENARIUSZ | symbol=STOXX50 | data_godzina=2026-05-15 14:19:14 | typ=SELL | numer_scenariusza=C90 | godzina_brokera=2026-05-15 15:10:00
+ZAMKNIECIE SCENARIUSZ | symbol=STOXX50 | data_godzina=2026-05-15 17:45:23 | typ=BUY | numer_scenariusza=C2 | godzina_brokera=2026-05-15 18:40:00
+ZAMKNIECIE SCENARIUSZ | symbol=STOXX50 | data_godzina=2026-05-15 17:55:36 | typ=SELL | numer_scenariusza=C90 | godzina_brokera=2026-05-15 18:50:00

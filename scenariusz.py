@@ -532,12 +532,13 @@ def get_trade_signal(
         }
 
     # SC1 (BUY): ADX(DI cross) + MCAD with ADX momentum and fresh MCAD cross.
-    if adx_buy and adx_inc and mcad_buy and mcad_fresh and not ichi_sell and not _is_price_inside_cloud(ichimoku_price_vs_cloud) and _within_window(buy_window, limits["strict"]):
-        return {
-            "signal": "BUY",
-            "scenario_number": 1,
-            "scenario_conditions": f"SC1 BUY (ADX+MCAD, strict) | {base_conditions}",
-        }
+    # WYŁĄCZONY: Win Rate 11.1%, strata -23.88 EUR (9 transakcji)
+    # if adx_buy and adx_inc and mcad_buy and mcad_fresh and not ichi_sell and not _is_price_inside_cloud(ichimoku_price_vs_cloud) and _within_window(buy_window, limits["strict"]):
+    #     return {
+    #         "signal": "BUY",
+    #         "scenario_number": 1,
+    #         "scenario_conditions": f"SC1 BUY (ADX+MCAD, strict) | {base_conditions}",
+    #     }
 
     # SC2 (BUY): Ichimoku + ADX.
     if adx_buy and ichi_buy and not mcad_sell and not _is_price_inside_cloud(ichimoku_price_vs_cloud) and _within_window(buy_window, limits["medium"]):

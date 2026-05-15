@@ -1,0 +1,13 @@
+ZAMKNIECIE SCENARIUSZ | symbol=UK100 | data_godzina=2026-05-14 18:20:24 | typ=BUY | numer_scenariusza=C90 | godzina_brokera=2026-05-14 19:15:00
+ZAMKNIECIE SCENARIUSZ | symbol=UK100 | data_godzina=2026-05-15 02:06:11 | typ=SELL | numer_scenariusza=C90 | godzina_brokera=2026-05-15 03:00:00
+ZAMKNIECIE SCENARIUSZ | symbol=UK100 | data_godzina=2026-05-15 03:10:01 | typ=SELL | numer_scenariusza=C90 | godzina_brokera=2026-05-15 04:05:00
+ZAMKNIECIE SCENARIUSZ | symbol=UK100 | data_godzina=2026-05-15 04:10:59 | typ=SELL | numer_scenariusza=C92 | godzina_brokera=2026-05-15 05:05:00
+ZAMKNIECIE SCENARIUSZ | symbol=UK100 | data_godzina=2026-05-15 05:11:57 | typ=SELL | numer_scenariusza=C92 | godzina_brokera=2026-05-15 06:05:00
+ZAMKNIECIE SCENARIUSZ | symbol=UK100 | data_godzina=2026-05-15 09:15:34 | typ=BUY | numer_scenariusza=C90 | godzina_brokera=2026-05-15 10:10:00
+ZAMKNIECIE SCENARIUSZ | symbol=UK100 | data_godzina=2026-05-15 10:50:19 | typ=SELL | numer_scenariusza=C92 | godzina_brokera=2026-05-15 11:45:00
+ZAMKNIECIE SCENARIUSZ | symbol=UK100 | data_godzina=2026-05-15 11:00:32 | typ=SELL | numer_scenariusza=C90 | godzina_brokera=2026-05-15 11:55:00
+ZAMKNIECIE SCENARIUSZ | symbol=UK100 | data_godzina=2026-05-15 14:06:20 | typ=SELL | numer_scenariusza=C90 | godzina_brokera=2026-05-15 15:00:00
+ZAMKNIECIE SCENARIUSZ | symbol=UK100 | data_godzina=2026-05-15 17:07:11 | typ=BUY | numer_scenariusza=C2 | godzina_brokera=2026-05-15 18:00:00
+ZAMKNIECIE SCENARIUSZ | symbol=UK100 | data_godzina=2026-05-15 17:17:22 | typ=SELL | numer_scenariusza=C90 | godzina_brokera=2026-05-15 18:10:00
+ZAMKNIECIE SCENARIUSZ | symbol=UK100 | data_godzina=2026-05-15 18:36:16 | typ=SELL | numer_scenariusza=C92 | godzina_brokera=2026-05-15 19:30:00
+ZAMKNIECIE SCENARIUSZ | symbol=UK100 | data_godzina=2026-05-15 19:07:27 | typ=BUY | numer_scenariusza=C90 | godzina_brokera=2026-05-15 20:00:00

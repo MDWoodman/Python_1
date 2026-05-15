@@ -1,0 +1,8 @@
+ZAMKNIECIE SCENARIUSZ | symbol=USTEC | data_godzina=2026-05-14 22:40:41 | typ=SELL | numer_scenariusza=C90 | godzina_brokera=2026-05-14 23:35:00
+ZAMKNIECIE SCENARIUSZ | symbol=USTEC | data_godzina=2026-05-15 00:42:23 | typ=BUY | numer_scenariusza=C90 | godzina_brokera=2026-05-15 01:35:00
+ZAMKNIECIE SCENARIUSZ | symbol=USTEC | data_godzina=2026-05-15 01:35:42 | typ=BUY | numer_scenariusza=C90 | godzina_brokera=2026-05-15 02:30:00
+ZAMKNIECIE SCENARIUSZ | symbol=USTEC | data_godzina=2026-05-15 02:46:53 | typ=SELL | numer_scenariusza=C90 | godzina_brokera=2026-05-15 03:40:00
+ZAMKNIECIE SCENARIUSZ | symbol=USTEC | data_godzina=2026-05-15 10:32:05 | typ=SELL | numer_scenariusza=C90 | godzina_brokera=2026-05-15 11:25:00
+ZAMKNIECIE SCENARIUSZ | symbol=USTEC | data_godzina=2026-05-15 11:26:11 | typ=SELL | numer_scenariusza=C90 | godzina_brokera=2026-05-15 12:20:00
+ZAMKNIECIE SCENARIUSZ | symbol=USTEC | data_godzina=2026-05-15 14:11:27 | typ=SELL | numer_scenariusza=C90 | godzina_brokera=2026-05-15 15:05:00
+ZAMKNIECIE SCENARIUSZ | symbol=USTEC | data_godzina=2026-05-15 15:07:31 | typ=SELL | numer_scenariusza=C90 | godzina_brokera=2026-05-15 16:00:00

@@ -1,2 +1,14 @@
 ZAMKNIECIE SCENARIUSZ | symbol=US500 | data_godzina=2026-05-13 12:31:02 | typ=BUY | numer_scenariusza=C1 | godzina_brokera=2026-05-13 13:25:00
 ZAMKNIECIE SCENARIUSZ | symbol=US500 | data_godzina=2026-05-13 16:40:48 | typ=SELL | numer_scenariusza=C92 | godzina_brokera=2026-05-13 17:35:00
+ZAMKNIECIE SCENARIUSZ | symbol=US500 | data_godzina=2026-05-14 18:05:10 | typ=BUY | numer_scenariusza=C90 | godzina_brokera=2026-05-14 19:00:00
+ZAMKNIECIE SCENARIUSZ | symbol=US500 | data_godzina=2026-05-14 21:01:36 | typ=SELL | numer_scenariusza=C92 | godzina_brokera=2026-05-14 21:55:00
+ZAMKNIECIE SCENARIUSZ | symbol=US500 | data_godzina=2026-05-15 00:11:55 | typ=SELL | numer_scenariusza=C92 | godzina_brokera=2026-05-15 01:05:00
+ZAMKNIECIE SCENARIUSZ | symbol=US500 | data_godzina=2026-05-15 01:30:37 | typ=BUY | numer_scenariusza=C90 | godzina_brokera=2026-05-15 02:25:00
+ZAMKNIECIE SCENARIUSZ | symbol=US500 | data_godzina=2026-05-15 02:47:04 | typ=SELL | numer_scenariusza=C90 | godzina_brokera=2026-05-15 03:40:00
+ZAMKNIECIE SCENARIUSZ | symbol=US500 | data_godzina=2026-05-15 09:31:07 | typ=BUY | numer_scenariusza=C90 | godzina_brokera=2026-05-15 10:25:00
+ZAMKNIECIE SCENARIUSZ | symbol=US500 | data_godzina=2026-05-15 10:32:07 | typ=SELL | numer_scenariusza=C90 | godzina_brokera=2026-05-15 11:25:00
+ZAMKNIECIE SCENARIUSZ | symbol=US500 | data_godzina=2026-05-15 11:26:13 | typ=SELL | numer_scenariusza=C90 | godzina_brokera=2026-05-15 12:20:00
+ZAMKNIECIE SCENARIUSZ | symbol=US500 | data_godzina=2026-05-15 14:11:30 | typ=SELL | numer_scenariusza=C90 | godzina_brokera=2026-05-15 15:05:00
+ZAMKNIECIE SCENARIUSZ | symbol=US500 | data_godzina=2026-05-15 15:07:33 | typ=SELL | numer_scenariusza=C90 | godzina_brokera=2026-05-15 16:00:00
+ZAMKNIECIE SCENARIUSZ | symbol=US500 | data_godzina=2026-05-15 16:39:05 | typ=BUY | numer_scenariusza=C90 | godzina_brokera=2026-05-15 17:30:00
+ZAMKNIECIE SCENARIUSZ | symbol=US500 | data_godzina=2026-05-15 19:10:06 | typ=BUY | numer_scenariusza=C90 | godzina_brokera=2026-05-15 20:05:00

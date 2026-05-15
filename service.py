@@ -326,7 +326,7 @@ def _calculate_protective_sl_candidate(
 ) -> float | None:
     side_upper = str(side or "").upper()
 
-    break_even_enabled = bool(getattr(cnf, "SL_BREAK_EVEN_ENABLED", True))
+    break_even_enabled = bool(getattr(cnf, "SL_BREAK_EVEN_ENABLED", False))
     candidate: float | None = None
 
     # Move SL to exact entry price only after trade turns profitable.
@@ -391,6 +391,7 @@ def _symbol_has_open_or_pending_transaction(symbol: str, opened_transactions_lis
 
     Do not treat plain "TO OPEN" signal rows as busy because they can stay stale
     after restarts and block valid entries.
+    Verify state with MT5 broker to prevent stale transaction records from blocking new signals.
     """
     symbol_name = str(symbol or "")
 
@@ -410,7 +411,14 @@ def _symbol_has_open_or_pending_transaction(symbol: str, opened_transactions_lis
     except Exception:
         has_db_open = False
 
-    return has_local_open or has_remote_opened or has_db_open
+    # Primary check: verify actual MT5 broker state to avoid stale records
+    has_broker_open = _broker_has_open_position(symbol_name)
+    if has_broker_open:
+        return True
+
+    # If any local/remote/db flags say open but MT5 says closed, then symbol is free
+    # (stale records will be cleaned up by _sync_manual_close_if_needed)
+    return False
 
 
 def _broker_has_open_position(symbol: str) -> bool:
